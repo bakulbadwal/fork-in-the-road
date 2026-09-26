@@ -15,9 +15,9 @@ A delivery robot learns from a hundred human drives around a pretzel cart. Half 
 | **0 · The Square** | Log the dispatcher's drives one at a time or all 100; drive the clerk's average route | A model trained with squared error answers a fork with the average, and the average of left and right is the cart. More data doesn't change it |
 | **1 · Fog Rolls In** | A t slider from 0 to 999 over 600 logged positions; the linear and cosine schedules; the arithmetic for one dot with live numbers | x_t = √ᾱ·x₀ + √(1−ᾱ)·ε is a crossfader set by the schedule. Cosine is half fog at t ≈ 500, linear at t ≈ 260 |
 | **2 · The Cartographer** | The exact best guess x̂₀ for every foggy dot at every t, with a pointer from each dot; the ε ↔ x̂₀ conversion worked for one dot | From pure fog the least-wrong single guess is the average of every route: the smudge. Predicting the noise and predicting the map are the same prediction |
-| **3 · Fog Lifts in Passes** | Denoise 600 routes from 600 fogs in 1, 2, 3, 5, 10 or 50 passes; DDIM η = 0 vs DDPM-like η = 1; traces and per-pass guesses; a live ladder of passes against dents | 1 pass: 100% in the cart. 5: 2%. 10: 0%. Each guess starts from a map that already leans, so the route commits. With the linear schedule two passes are 94% in the cart |
-| **4 · The Stopwatch** | Milliseconds per pass, a 5–50 Hz control loop, and the ladder with a budget line | 10 ms a pass and 100 ms a card is 10 DDIM passes, which are already enough. DDPM's 1,000 would take 10 s |
-| **5 · The Lookout** | Park the cart anywhere; draw 600 routes with the report and 600 blindfolded, side by side | Conditioning: with the observation the routes go around today's cart; without it, around where it used to be, and 28% hit it at +1.0. FiLM vs Unit 2's channel concatenation |
+| **3 · Fog Lifts in Passes** | Denoise 600 pins from 600 fogs in 1, 2, 3, 5, 10 or 50 passes; DDIM η = 0 vs DDPM-like η = 1; the sampler's traces and per-pass guesses; a live ladder of passes against dents | 1 pass: 100% in the cart. 5: 2%. 10: 1 of 600. Each guess starts from a map that already leans, so the pin commits to a side. With the linear schedule two passes are 94% in the cart |
+| **4 · The Stopwatch** | Milliseconds per pass, pins per card, and the ladder with a waiting-share column | A card of 8 pins is 0.8 s of driving; 10 DDIM passes at 10 ms are 0.1 s, an eighth of it, and already enough. Walking the course's 1,000-step schedule would take 10 s |
+| **5 · The Lookout** | Park the cart anywhere; draw 600 pins with the report and 600 blindfolded, side by side | Conditioning: with the observation the pins go around today's cart; without it, around where it used to be, and 28% land in it at +1.0. FiLM vs Unit 2's channel concatenation |
 | **6 · Pin 16, Drive 8** | The courier drives: cartographer or clerk, 1–50 passes, 1–16 pins per card, lookout on or off, a vendor who pushes the cart mid-drive; 20-drive fleets with dents, side flips and time | Receding-horizon control on a diffusion sampler. Re-plan every pin and it dithers (1.9 flips a drive); drive 8 and it commits; drive all 16 and it can't react; blindfold it and half the drives dent |
 | **★ Review Board** | Three incident reports: the straight-liner, the ditherer, the slowpoke. Run the rule, pick a fix, re-drive 20 times, name the cause | The tempting wrong fixes (more data, more passes, a shorter card, a faster motor) fail for the reason the step taught |
 | **✓ Field Test** | Eight questions answered by operating the widgets | Proof it stuck |
@@ -44,7 +44,7 @@ The interactive diffusion explainers are about images or about the geometry, and
 
 Cart-Pole Diffusion is the one to open next if you want to see a *learned* denoiser drive a plant in real time; Diffusion Explorer is the one for watching a real model train on a distribution you drew.
 
-![Six hundred routes lifted from fog in ten passes, traced, with the ladder of passes against dents](docs/lift.png)
+![Six hundred pins lifted from fog in ten passes, thirty of them with the sampler's path traced, with the ladder of passes against dents](docs/lift.png)
 
 ## Run it
 
@@ -52,7 +52,7 @@ Play it live at the link above, or open `index.html` in a browser. There's no bu
 
 ## What's exact and what's a model
 
-- **Exact, real math:** the forward process x_t = √ᾱ·x₀ + √(1−ᾱ)·ε; the linear and cosine (`squaredcos_cap_v2`) schedules built the way diffusers builds them; the denoiser, which is the exact Bayes posterior mean E[x₀ | x_t] for the toy demonstration distribution, what a perfectly trained noise-prediction network converges to, with no training error; the ε ↔ x̂₀ conversion; DDIM sampling with η (Song et al., 2021, eq. 12); the mixture mean as the squared-error-optimal single guess; every number quoted from the Diffusion Policy paper.
+- **Exact, real math:** the forward process x_t = √ᾱ·x₀ + √(1−ᾱ)·ε; the linear and cosine (`squaredcos_cap_v2`) schedules built the way diffusers builds them; the denoiser, which is the exact Bayes posterior mean E[x₀ | x_t] for the toy demonstration distribution, what a perfectly trained noise-prediction network converges to, with no training error; the ε ↔ x̂₀ conversion; DDIM sampling with η (Song et al., 2021, eq. 12) on diffusers' "trailing" timestep spacing; the mixture mean as the squared-error-optimal single guess; every number quoted from the Diffusion Policy paper.
 - **Teaching models, labelled on the page:**
   - The square, the two demonstrated routes, and how the demonstrators' choice of side leans with the courier's position are hand-designed.
   - The courier teleports between checkpoints ten times a second and stands still while a card is drawn; the vendor's push and pacing are one-number toys.

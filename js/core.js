@@ -39,7 +39,8 @@
     return { kind: kind === "linear" ? "linear" : "cosine", betas: betas, ab: ab };
   }
   function abAt(sch, t) { return t < 0 ? 1 : sch.ab[t]; }
-  // The K timesteps a K-pass sampler visits, most noisy first (diffusers' "leading" spacing).
+  // The K timesteps a K-pass sampler visits, most noisy first: 999, 999 − T/K, … (diffusers' "trailing" spacing;
+  // its DDIMScheduler defaults to "leading", 900 … 0 for K = 10, which never starts a chain at t = 999).
   function timesteps(K) { var ts = []; for (var i = 0; i < K; i++) ts.push(Math.round((T - 1) - i * T / K)); return ts; }
 
   /* ---------- the forward process ---------- */

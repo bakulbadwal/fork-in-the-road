@@ -13,14 +13,25 @@
   // The demonstrated route on side s (−1 left, +1 right) when the cart sits at fx. Starts and ends on the centre line.
   function routeX(y, s, fx) { return (fx + s * A) * bump(y); }
   function inCart(x, y, fx) { return Math.abs(x - fx) < CART.hw && Math.abs(y) < CART.hh; }
-  function classify(x, y, fx) { return inCart(x, y, fx) ? "cart" : (x < fx ? "left" : "right"); }
-  function tally(pts, fx) {
+  // Which demonstrated route a point belongs to: the nearest component's side. Falls back to the cart's centre line.
+  function sideOf(x, y, comps) {
+    if (!comps) return null;
+    var best = -1, bd = Infinity;
+    for (var k = 0; k < comps.length; k++) { var dx = x - comps[k].mu[0], dy = y - comps[k].mu[1], d = dx * dx + dy * dy; if (d < bd) { bd = d; best = k; } }
+    return comps[best].side;
+  }
+  function classify(x, y, fx, comps) {
+    if (inCart(x, y, fx)) return "cart";
+    var s = sideOf(x, y, comps);
+    return (s == null ? x < fx : s < 0) ? "left" : "right";
+  }
+  function tally(pts, fx, comps) {
     var n = { left: 0, right: 0, cart: 0 };
-    pts.forEach(function (p) { n[classify(p[0], p[1], fx)]++; });
+    pts.forEach(function (p) { n[classify(p[0], p[1], fx, comps)]++; });
     n.total = pts.length; return n;
   }
 
-  /* ---------- the 2-D map (steps 1–5): one logged position per demo drive ---------- */
+  /* ---------- the 2-D map (steps 1–5): six logged positions per demo drive ---------- */
   var LEVELS = [-1.0, -0.6, -0.2, 0.2, 0.6, 1.0], SIG = 0.13;
   var BASIS2 = FR.identityBasis(2, SIG * SIG);
   function map2d(fx) {
@@ -28,11 +39,12 @@
     [-1, 1].forEach(function (s) { LEVELS.forEach(function (y) { comps.push({ mu: [routeX(y, s, fx), y], lp: Math.log(1 / 12), side: s }); }); });
     return comps;
   }
-  function demos2d(n, seed, fx) {
-    var r = FR.rng(seed), comps = map2d(fx), pts = [];
-    for (var i = 0; i < n; i++) {
-      var c = comps[Math.floor(r() * comps.length)];
-      pts.push({ x0: c.mu[0] + SIG * r.normal(), y0: c.mu[1] + SIG * r.normal(), side: c.side, ex: r.normal(), ey: r.normal() });
+  // nDrives drives, alternating left and right, each logging one position at each of the six levels.
+  function demos2d(nDrives, seed, fx) {
+    var r = FR.rng(seed), pts = [];
+    for (var d = 0; d < nDrives; d++) {
+      var s = d % 2 === 0 ? -1 : 1;
+      LEVELS.forEach(function (y) { pts.push({ x0: routeX(y, s, fx) + SIG * r.normal(), y0: y + SIG * r.normal(), side: s, drive: d, ex: r.normal(), ey: r.normal() }); });
     }
     return pts;
   }
@@ -41,7 +53,7 @@
     var comps = map2d(o.fxSeen == null ? o.fx : o.fxSeen);
     var res = FR.sample({ K: o.K, eta: o.eta || 0, sch: o.sch, comps: comps, basis: BASIS2, D: 2, n: o.n || 600, seed: o.seed == null ? 11 : o.seed });
     var pts = res.map(function (c) { return c.x; });
-    return { chains: res, tally: tally(pts, o.fx), comps: comps };
+    return { chains: res, tally: tally(pts, o.fx, comps), comps: comps };
   }
 
   /* ---------- the waypoint card (step 6 and the review board): 16 lateral positions ahead ---------- */
@@ -63,10 +75,11 @@
   /* ---------- one drive across the square ----------
      cfg: policy 'diffusion' | 'averager' · K passes · eta · Ta executed per card · lookout (sees the cart) ·
           msPerPass · cartAt(t) → fx · seed · sch · dtWp (seconds per checkpoint) · maxDecisions
-     The courier stands still while the card is being drawn (think time = K × msPerPass), then drives Ta checkpoints. */
+     The courier stands still while the card is being drawn (think time = K × msPerPass), then drives Ta checkpoints.
+     A card's side is where it passes the cart: left, right, or through (0). Side flips count left↔right changes only. */
   function drive(cfg) {
     var r = FR.rng(cfg.seed == null ? 1 : cfg.seed), sch = cfg.sch, dt = cfg.dtWp || DT_WP;
-    var px = 0, py = START_Y, t = 0, hit = false, path = [{ x: 0, y: py, t: 0 }], decisions = [], flips = 0, lastSide = null;
+    var px = 0, py = START_Y, t = 0, hit = false, path = [{ x: 0, y: py, t: 0 }], decisions = [], flips = 0, lastSide = 0;
     var Ta = cfg.Ta || 8, K = cfg.K || 10, ms = cfg.msPerPass == null ? 10 : cfg.msPerPass, max = cfg.maxDecisions || 80;
     while (py < GOAL_Y - 1e-9 && !hit && decisions.length < max) {
       var fxNow = cfg.cartAt(t), obsFx = cfg.lookout ? fxNow : (cfg.blindFx || 0);
@@ -82,11 +95,14 @@
         chunk = x; think = K * ms / 1000;
       }
       var ys = chunkYs(py), iz = 0; for (var q = 1; q < H; q++) if (Math.abs(ys[q]) < Math.abs(ys[iz])) iz = q;
-      var side = chunk[iz] < obsFx ? -1 : 1;
-      if (lastSide !== null && side !== lastSide && py < 0) flips++;
-      lastSide = side;
+      var side = Math.abs(chunk[iz] - obsFx) < CART.hw ? 0 : (chunk[iz] < obsFx ? -1 : 1);
+      if (lastSide !== 0 && side !== 0 && side !== lastSide && py < 0) flips++;
+      if (side !== 0) lastSide = side;
       decisions.push({ t: t, x: px, y: py, obsFx: obsFx, realFx: fxNow, chunk: chunk, ys: ys, side: side, think: think, w: weights });
+      // the cart can roll into a courier that is standing still, thinking
+      for (var w = 1; w <= 4 && !hit; w++) if (inCart(px, py, cfg.cartAt(t + think * w / 4))) hit = true;
       t += think;
+      if (hit) { path.push({ x: px, y: py, t: t }); break; }
       for (var e = 0; e < Ta && py < GOAL_Y - 1e-9; e++) {
         var nx = chunk[e], ny = ys[e];
         for (var u = 1; u <= 5 && !hit; u++) {                      // check the road between checkpoints, against where the cart is at that moment
@@ -113,7 +129,7 @@
   var pushed = function (fx0, at, by) { return function (t) { return t >= at ? fx0 + by : fx0; }; };
   var pacing = function (amp, period) { return function (t) { return amp * Math.sin(2 * Math.PI * t / period); }; };
 
-  var S = { START_Y: START_Y, GOAL_Y: GOAL_Y, VIEW: VIEW, CART: CART, A: A, bump: bump, routeX: routeX, inCart: inCart, classify: classify, tally: tally,
+  var S = { START_Y: START_Y, GOAL_Y: GOAL_Y, VIEW: VIEW, CART: CART, A: A, bump: bump, routeX: routeX, inCart: inCart, sideOf: sideOf, classify: classify, tally: tally,
     LEVELS: LEVELS, SIG: SIG, BASIS2: BASIS2, map2d: map2d, demos2d: demos2d, run2d: run2d,
     H: H, DY: DY, KAPPA: KAPPA, LAM: LAM, BASIS16: BASIS16, chunkMean: chunkMean, chunkComps: chunkComps, chunkYs: chunkYs, DT_WP: DT_WP,
     drive: drive, fleet: fleet, still: still, pushed: pushed, pacing: pacing };

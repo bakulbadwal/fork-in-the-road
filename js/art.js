@@ -276,7 +276,7 @@
     // the courier waiting with a stopwatch
     s += courier(560, 330, 0.85, { flip: true }) + '<circle cx="600" cy="262" r="16" fill="' + SHEET + '" stroke="' + L + '" stroke-width="2.5"/><path d="M600 262 V250 M600 244 v-4 M596 240 h8" stroke="' + L + '" stroke-width="2.5" stroke-linecap="round"/>';
     s += board(270, 8, 420, "HOW MANY PASSES CAN YOU AFFORD", YEL);
-    s += label(180, 84, "the control loop: a new card 10 times a second", [140, 150], { size: 15, from: [180, 80] });
+    s += label(180, 84, "10 pins a second: a card of 8 lasts 0.8 s", [140, 150], { size: 15, from: [180, 80] });
     s += label(420, 190, "the courier waits for the card", [560, 300], { size: 14, from: [520, 186] });
     s += label(200, 360, "fast desk: 10 DDIM passes, 10 ms each, fits the budget", null, { size: 15 });
     s += label(200, 384, "slow desk: 1,000 passes, the square has changed by the time the card is ready", null, { size: 15 });

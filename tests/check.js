@@ -3,7 +3,8 @@
 var FR = require("../js/core.js"), S = require("../js/sim.js");
 var cos = FR.schedule("cosine"), lin = FR.schedule("linear");
 function f(x, d) { return Number(x).toFixed(d == null ? 3 : d); }
-function pct(n) { return Math.round(100 * n) + "%"; }
+// the same rounding the page uses: a non-zero count under 0.5% prints as "<1%"
+function pct(n) { return (n > 0 && n < 0.005 ? "<1%" : Math.round(100 * n) + "%") + " (" + Math.round(n * 600) + ")"; }
 
 console.log("== A. schedules ==");
 [0, 250, 500, 750, 999].forEach(function (t) {
@@ -44,12 +45,13 @@ console.log("η = 1 (DDPM-like):");
 [2, 5, 10, 50].forEach(function (K) { var r = S.run2d({ K: K, eta: 1, sch: cos, fx: 0 }); console.log(" K=" + K, "cart " + pct(r.tally.cart / 600), "left " + pct(r.tally.left / 600)); });
 console.log("linear schedule:");
 [1, 2, 5, 10].forEach(function (K) { var r = S.run2d({ K: K, eta: 0, sch: lin, fx: 0 }); console.log(" K=" + K, "cart " + pct(r.tally.cart / 600)); });
-console.log("budget at 10 ms/pass, 10 Hz (100 ms): passes that fit =", K_LIST.filter(function (K) { return K * 10 <= 100; }));
+console.log("demos: " + S.demos2d(100, 7, 0).filter(function (p) { return p.side < 0; }).length + " left-drive positions of 600");
+console.log("budget: a card of 8 pins at 10 pins/s lasts 0.8 s; at 10 ms/pass, passes that fit = " + Math.floor(800 / 10) + "; 10 passes = 0.1 s (" + Math.round(100 * 0.1 / 0.9) + "% of the cycle waiting); 1,000 passes = 10 s");
 
 console.log("\n== D. the lookout (conditioning) ==");
 [0.4, 0.7, 1.0].forEach(function (fx) {
   var seen = S.run2d({ K: 10, eta: 0, sch: cos, fx: fx, fxSeen: fx }), blind = S.run2d({ K: 10, eta: 0, sch: cos, fx: fx, fxSeen: 0 });
-  console.log(" cart at " + fx + ": with lookout cart " + pct(seen.tally.cart / 600) + " · blind cart " + pct(blind.tally.cart / 600) + " (blind left " + pct(blind.tally.left / 600) + ")");
+  console.log(" cart at " + fx + ": with lookout cart " + pct(seen.tally.cart / 600) + " · blind cart " + pct(blind.tally.cart / 600) + " (blind left-route " + pct(blind.tally.left / 600) + ", in-cart samples on the right route: " + blind.chains.filter(function (c) { return S.inCart(c.x[0], c.x[1], fx) && S.sideOf(c.x[0], c.x[1], blind.comps) > 0; }).length + ")");
 });
 
 console.log("\n== E. the drive (16-waypoint card) ==");

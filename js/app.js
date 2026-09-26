@@ -117,17 +117,17 @@
 
   /* ---------------- animation: one loop per event, none at rest ---------------- */
   function anim(ms, onFrame, onDone) {
-    var h = { stopped: false, stop: function () { h.stopped = true; } };
-    if (REDUCED) { onFrame(1); if (onDone) onDone(); return h; }
-    var t0 = null;
-    function step(now) {
-      if (h.stopped) return;
-      if (t0 === null) t0 = now;
-      var u = Math.min(1, (now - t0) / ms);
+    var iv = null, h = { stopped: false, stop: function () { h.stopped = true; if (iv) clearInterval(iv); } };
+    if (REDUCED) { onFrame(1); if (onDone) setTimeout(onDone, 0); return h; }   // deferred, so the caller's handle assignment lands first
+    var t0 = performance.now(), done = false;
+    function tick() {
+      if (h.stopped || done) return;
+      var u = Math.min(1, (performance.now() - t0) / ms);
       onFrame(u);
-      if (u < 1) requestAnimationFrame(step); else if (onDone) onDone();
+      if (u >= 1) { done = true; clearInterval(iv); if (onDone) onDone(); }
     }
-    requestAnimationFrame(step);
+    (function loop() { if (h.stopped || done) return; tick(); if (!done) requestAnimationFrame(loop); })();
+    iv = setInterval(tick, 300);   // a run still finishes in a background tab, where animation frames stop
     return h;
   }
   var ease = function (u) { return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2; };
@@ -221,7 +221,8 @@
   function classCol(cl) { return cl === "cart" ? COL.cart : cl === "left" ? COL.left : COL.right; }
 
   /* ================= STEP 0: the square ================= */
-  var DEMOS = S.demos2d(600, 7, 0);
+  var DEMOS = S.demos2d(100, 7, 0);   // 100 drives, alternating sides, six logged positions each
+  function cartCol(count) { return count === 0 ? "#3B7422" : count / 600 < 0.005 ? "#8A6300" : COL.cart; }
   function initS0() {
     var view = SquareView("s0c"), view2 = SquareView("s0c2"), logged = [], drives = 0, nl = 0, nr = 0, running = null;
     var r = FR.rng(21);
@@ -234,9 +235,7 @@
     // one drive: the courier follows a demonstrated route, and its six logged positions drop onto the map
     $("s0demo").onclick = function () {
       if (running) return;
-      var side = drives % 2 === 0 ? -1 : 1; drives++; if (side < 0) nl++; else nr++;
-      var pts = DEMOS.filter(function (p) { return p.side === side; }).slice((drives - 1) * 3, (drives - 1) * 3 + 6);
-      if (pts.length < 6) pts = DEMOS.filter(function (p) { return p.side === side; }).slice(0, 6);
+      var pts = DEMOS.filter(function (p) { return p.drive === drives % 100; }), side = pts[0].side; drives++; if (side < 0) nl++; else nr++;
       logRow(drives, side);
       running = anim(1400, function (u) {
         var y = S.START_Y + (S.GOAL_Y - S.START_Y) * ease(u), x = S.routeX(y, side, 0);
@@ -320,29 +319,32 @@
     function idle() { view.render({ fx: 0, routes: true, caption: "pure fog: press Lift the fog" }); }
     function renderLadder() {
       var rows = ladder(schName, eta);
-      $("s3lad").innerHTML = "<tr><th>passes</th><th>went left</th><th>went right</th><th>inside the cart</th></tr>" + rows.map(function (r) { return '<tr class="' + (r.K === K ? "now" : "") + '"><td class="n">' + r.K + "</td><td>" + pct(r.tally.left / 600) + "</td><td>" + pct(r.tally.right / 600) + '</td><td class="n" style="color:' + (r.tally.cart ? COL.cart : "#3B7422") + '">' + pct(r.tally.cart / 600) + "</td></tr>"; }).join("");
+      $("s3lad").innerHTML = "<tr><th>passes</th><th>went left</th><th>went right</th><th>inside the cart</th></tr>" + rows.map(function (r) { return '<tr class="' + (r.K === K ? "now" : "") + '"><td class="n">' + r.K + "</td><td>" + pct(r.tally.left / 600) + "</td><td>" + pct(r.tally.right / 600) + '</td><td class="n" style="color:' + cartCol(r.tally.cart) + '">' + pct(r.tally.cart / 600) + (r.tally.cart && r.tally.cart < 12 ? " (" + r.tally.cart + ")" : "") + "</td></tr>"; }).join("");
     }
-    function stats(chains, done, pass) {
-      if (!done) { $("s3l").textContent = "–"; $("s3r").textContent = "–"; $("s3cart").textContent = "–"; $("s3st").innerHTML = "pass <b>" + pass + " / " + K + "</b>"; return; }
-      var tl = S.tally(chains.map(function (c) { return c.x; }), 0);
+    // A run keeps its own settings (run.K, run.eta, run.sch) so changing a control mid-animation can't break it.
+    function stats(run, done, pass) {
+      if (!done) { $("s3l").textContent = "–"; $("s3r").textContent = "–"; $("s3cart").textContent = "–"; $("s3st").innerHTML = "pass <b>" + pass + " / " + run.K + "</b>"; return; }
+      var tl = S.tally(run.chains.map(function (c) { return c.x; }), 0, run.comps);
       $("s3l").textContent = pct(tl.left / 600); $("s3r").textContent = pct(tl.right / 600); $("s3cart").textContent = pct(tl.cart / 600);
-      $("s3st").innerHTML = "<b>" + K + "</b> pass" + (K > 1 ? "es" : "") + " · " + tl.cart + " of 600 in the cart";
+      $("s3st").innerHTML = "<b>" + run.K + "</b> pass" + (run.K > 1 ? "es" : "") + " · " + tl.cart + " of 600 in the cart";
     }
-    function frame(chains, pass, u, done) {
-      var pts = chains.map(function (c) { var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)], x = a[0] + (b2[0] - a[0]) * u, y = a[1] + (b2[1] - a[1]) * u; return { x: x, y: y, col: done ? classCol(S.classify(c.x[0], c.x[1], 0)) : COL.fog }; });
-      var trails = $("s3trail").checked ? chains.slice(0, 30).map(function (c) { var tp = c.trail.slice(0, pass + 1).map(function (p) { return [p[0], p[1]]; }); var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)]; tp.push([a[0] + (b2[0] - a[0]) * u, a[1] + (b2[1] - a[1]) * u]); return { pts: tp, col: done ? classCol(S.classify(c.x[0], c.x[1], 0)) : COL.fog }; }) : null;
+    function frame(run, pass, u, done) {
+      var chains = run.chains, cl = function (c) { return classCol(S.classify(c.x[0], c.x[1], 0, run.comps)); };
+      var pts = chains.map(function (c) { var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)], x = a[0] + (b2[0] - a[0]) * u, y = a[1] + (b2[1] - a[1]) * u; return { x: x, y: y, col: done ? cl(c) : COL.fog }; });
+      var trails = $("s3trail").checked ? chains.slice(0, 30).map(function (c) { var tp = c.trail.slice(0, pass + 1).map(function (p) { return [p[0], p[1]]; }); var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)]; tp.push([a[0] + (b2[0] - a[0]) * u, a[1] + (b2[1] - a[1]) * u]); return { pts: tp, col: done ? cl(c) : COL.fog }; }) : null;
       var guess = $("s3guess").checked && !done ? chains.map(function (c) { return c.guesses[Math.min(pass, c.guesses.length - 1)]; }) : null;
-      view.render({ fx: 0, routes: done, pts: pts, trails: trails, guess: guess, caption: done ? K + " pass" + (K > 1 ? "es" : "") + " · " + (eta ? "DDPM-like η = 1" : "DDIM η = 0") + " · " + schName : "pass " + (pass + 1) + " of " + K });
+      view.render({ fx: 0, routes: done, pts: pts, trails: trails, guess: guess, caption: done ? run.K + " pass" + (run.K > 1 ? "es" : "") + " · " + (run.eta ? "DDPM-like η = 1" : "DDIM η = 0") + " · " + run.sch : "pass " + (pass + 1) + " of " + run.K });
     }
     $("s3go").onclick = function () {
       if (running) running.stop();
-      var res = S.run2d({ K: K, eta: eta, sch: SCH[schName], fx: 0, n: 600, seed: 11 }), chains = res.chains, pass = 0, per = Math.max(140, Math.min(800, 3000 / K));
-      last = chains; $("s3go").disabled = true;
+      var res = S.run2d({ K: K, eta: eta, sch: SCH[schName], fx: 0, n: 600, seed: 11 });
+      var run = { chains: res.chains, comps: res.comps, K: K, eta: eta, sch: schName }, pass = 0, per = Math.max(140, Math.min(800, 3000 / run.K));
+      last = run; $("s3go").disabled = true;
       function next() {
-        stats(chains, false, pass + 1);
-        running = anim(per, function (u) { frame(chains, pass, ease(u), false); }, function () {
+        stats(run, false, pass + 1);
+        running = anim(per, function (u) { frame(run, pass, ease(u), false); }, function () {
           pass++;
-          if (pass < K) next(); else { frame(chains, K - 1, 1, true); stats(chains, true); running = null; $("s3go").disabled = false; touch("s3"); }
+          if (pass < run.K) next(); else { frame(run, run.K - 1, 1, true); stats(run, true); running = null; $("s3go").disabled = false; touch("s3"); }
         });
       }
       next();
@@ -350,24 +352,25 @@
     seg($("s3k"), [1, 2, 3, 5, 10, 50].map(function (k) { return { v: k, label: String(k) }; }), K, function (v) { K = +v; renderLadder(); });
     seg($("s3eta"), [{ v: 0, label: "DDIM · η = 0" }, { v: 1, label: "DDPM-like · η = 1" }], eta, function (v) { eta = +v; renderLadder(); });
     seg($("s3sch"), SCH_OPTS, schName, function (v) { schName = v; renderLadder(); });
-    $("s3trail").addEventListener("change", function () { if (last && !running) frame(last, K - 1, 1, true); });
-    idle(); renderLadder(); stats(null, false, 0); $("s3st").textContent = "";
-    redraws.push(function () { if ($("s3").classList.contains("on")) { if (last && !running) frame(last, K - 1, 1, true); else if (!running) idle(); } });
+    $("s3trail").addEventListener("change", function () { if (last && !running) frame(last, last.K - 1, 1, true); });
+    idle(); renderLadder(); $("s3st").textContent = "";
+    redraws.push(function () { if ($("s3").classList.contains("on")) { if (last && !running) frame(last, last.K - 1, 1, true); else if (!running) idle(); } });
   }
 
   /* ================= STEP 4: the stopwatch ================= */
   function initS4() {
-    var ms = 10, hz = 10, schName = "cosine";
+    var ms = 10, ta = 8, schName = "cosine";
+    var tstr = function (msv) { return msv >= 1000 ? fmt(msv / 1000, msv >= 10000 ? 0 : 1) + " s" : fmt(msv, 0) + " ms"; };
     function draw() {
-      var budget = 1000 / hz, rows = ladder(schName, 0, true), fits = rows.filter(function (r) { return r.K * ms <= budget; }), best = fits.length ? fits[fits.length - 1] : null;
-      $("s4msv").textContent = ms; $("s4bud").textContent = fmt(budget, 0) + " ms"; $("s4max").textContent = best ? best.K : "0";
-      $("s4cart").textContent = best ? pct(best.tally.cart / 600) : "–"; $("s4cart").className = "v " + (best && best.tally.cart === 0 ? "good" : "bad");
-      $("s4ddpm").textContent = fmt(1000 * ms / 1000, 1) + " s";
-      $("s4m").innerHTML = "budget = 1000 ÷ " + hz + " = <b>" + fmt(budget, 0) + " ms</b> · passes ≤ " + fmt(budget, 0) + " ÷ " + ms + " = <b>" + fmt(Math.floor(budget / ms), 0) + "</b>" + (best ? "<br>the biggest rung that fits: <b>" + best.K + " passes</b>, " + fmt(best.K * ms, 0) + " ms, " + pct(best.tally.cart / 600) + " in the cart" : "<br><span class='bad'>not even one pass fits</span>");
-      $("s4lad").innerHTML = "<tr><th>passes</th><th>time</th><th>fits?</th><th>inside the cart</th></tr>" + rows.map(function (r) { var tm = r.K * ms, ok = tm <= budget; return '<tr class="' + (best && r.K === best.K ? "now" : "") + (ok ? "" : " no") + (r.K === 1000 ? " slow" : "") + '"><td class="n">' + r.K + (r.K === 1000 ? " (DDPM)" : "") + "</td><td>" + (tm >= 1000 ? fmt(tm / 1000, 1) + " s" : fmt(tm, 0) + " ms") + "</td><td>" + (ok ? "✓" : "✗") + '</td><td class="n" style="color:' + (r.tally.cart ? COL.cart : "#3B7422") + '">' + pct(r.tally.cart / 600) + "</td></tr>"; }).join("");
+      var card = ta * S.DT_WP * 1000, rows = ladder(schName, 0, true), fit = Math.floor(card / ms), ten = 10 * ms, wait10 = ten / (ten + card);
+      $("s4msv").textContent = ms; $("s4bud").textContent = tstr(card); $("s4max").textContent = fmt(fit, 0);
+      $("s4wait").textContent = pct(wait10); $("s4wait").className = "v " + (wait10 <= 0.2 ? "good" : wait10 <= 0.5 ? "warn" : "bad");
+      $("s4ddpm").textContent = tstr(1000 * ms);
+      $("s4m").innerHTML = "one card = " + ta + " pins × 0.1 s = <b>" + tstr(card) + "</b> of driving · passes ≤ " + fmt(card, 0) + " ÷ " + ms + " = <b>" + fmt(fit, 0) + "</b><br>10 passes: wait " + tstr(ten) + ", drive " + tstr(card) + " → <b>" + pct(wait10) + "</b> of each cycle standing still · 1,000 passes: wait " + tstr(1000 * ms) + " per " + tstr(card) + " of driving";
+      $("s4lad").innerHTML = "<tr><th>passes</th><th>drawing the card</th><th>waiting share</th><th>fits?</th><th>inside the cart</th></tr>" + rows.map(function (r) { var tm = r.K * ms, ok = tm <= card; return '<tr class="' + (r.K === 10 ? "now" : "") + (ok ? "" : " no") + (r.K === 1000 ? " slow" : "") + '"><td class="n">' + r.K + (r.K === 1000 ? " (the whole schedule)" : "") + "</td><td>" + tstr(tm) + "</td><td>" + pct(tm / (tm + card)) + "</td><td>" + (ok ? "✓" : "✗") + '</td><td class="n" style="color:' + cartCol(r.tally.cart) + '">' + pct(r.tally.cart / 600) + "</td></tr>"; }).join("");
     }
     $("s4ms").addEventListener("input", function () { ms = +this.value; draw(); touch("s4"); });
-    seg($("s4hz"), [5, 10, 20, 50].map(function (h) { return { v: h, label: h + " Hz · " + fmt(1000 / h, 0) + " ms" }; }), hz, function (v) { hz = +v; draw(); touch("s4"); });
+    seg($("s4ta"), [1, 4, 8, 16].map(function (k) { return { v: k, label: k + " pin" + (k > 1 ? "s" : "") + " · " + fmt(k * 100, 0) + " ms" }; }), ta, function (v) { ta = +v; draw(); touch("s4"); });
     seg($("s4sch"), SCH_OPTS, schName, function (v) { schName = v; draw(); touch("s4"); });
     var drawn = false;
     redraws.push(function () { if ($("s4").classList.contains("on") && !drawn) { drawn = true; draw(); } });
@@ -380,10 +383,10 @@
     function run() {
       var seen = S.run2d({ K: 10, eta: 0, sch: SCH.cosine, fx: fx, fxSeen: fx, n: 600, seed: 11 }), blind = S.run2d({ K: 10, eta: 0, sch: SCH.cosine, fx: fx, fxSeen: 0, n: 600, seed: 11 });
       ran = { seen: seen, blind: blind, fx: fx };
-      va.render({ fx: fx, routes: true, pts: seen.chains.map(function (c) { return { x: c.x[0], y: c.x[1], col: classCol(S.classify(c.x[0], c.x[1], fx)) }; }), caption: "with the report · cart at " + sgn(fx, 1) });
-      vb.render({ fx: fx, ghost: 0, routes: true, routesFx: 0, pts: blind.chains.map(function (c) { return { x: c.x[0], y: c.x[1], col: classCol(S.classify(c.x[0], c.x[1], fx)) }; }), caption: "blindfolded · she thinks the cart is at 0.0" });
+      va.render({ fx: fx, routes: true, pts: seen.chains.map(function (c) { return { x: c.x[0], y: c.x[1], col: classCol(S.classify(c.x[0], c.x[1], fx, seen.comps)) }; }), caption: "with the report · cart at " + sgn(fx, 1) });
+      vb.render({ fx: fx, ghost: 0, routes: true, routesFx: 0, pts: blind.chains.map(function (c) { return { x: c.x[0], y: c.x[1], col: classCol(S.classify(c.x[0], c.x[1], fx, blind.comps)) }; }), caption: "blindfolded · she thinks the cart is at 0.0" });
       $("s5ac").textContent = pct(seen.tally.cart / 600); $("s5al").textContent = pct(seen.tally.left / 600); $("s5bc").textContent = pct(blind.tally.cart / 600); $("s5bl").textContent = pct(blind.tally.left / 600);
-      $("s5st").innerHTML = "600 routes each · blind: <b>" + blind.tally.cart + "</b> in the cart";
+      $("s5st").innerHTML = "600 pins each · blind: <b>" + blind.tally.cart + "</b> in the cart · with the report: <b>" + seen.tally.cart + "</b>";
     }
     $("s5fx").addEventListener("input", function () { fx = +this.value; $("s5fxv").textContent = sgn(fx, 1); ran = null; idle(); touch("s5"); });
     $("s5go").onclick = function () { run(); touch("s5"); };
@@ -412,7 +415,7 @@
       if (ph.kind === "think") pins.forEach(function (p, j) { p.state = j < cfg.Ta ? "lit" : "plan"; });
       var finished = ph === phases[phases.length - 1] && u >= 1;
       view.render({ fx: fxNow, ghost: dc.obsFx, routes: false, path: pathTo(tau), pins: pins, courier: { x: pos.x, y: pos.y, dizzy: finished && d.hit }, flash: finished && d.hit, caption: (ph.kind === "think" ? "drawing card " + (ph.i + 1) : "driving card " + (ph.i + 1)) + " · t = " + tau.toFixed(1) + " s" });
-      hud(tau, ph, dc, driven, finished);
+      hud(tau, ph, dc, driven, finished, cfg);
     }
     var k = 0;
     function next() {
@@ -430,14 +433,15 @@
     var view = SquareView("s6c"), o = { policy: "diffusion", K: 10, Ta: 8, lookout: true, push: false, fx: 0 }, running = null, lastDrive = null;
     function idle() { view.render({ fx: o.fx, routes: true, courier: { x: 0, y: S.START_Y }, caption: "at the depot · press Drive" }); $("s6t").textContent = "0.0 s"; $("s6card").textContent = "–"; $("s6do").textContent = "ready"; $("s6dent").textContent = "0"; $("s6pins").innerHTML = ""; $("s6st").textContent = ""; }
     function pinsRow(dc, driven, Ta) { $("s6pins").innerHTML = dc.chunk.map(function (x, j) { return "<i class='" + (j < Ta ? (j < driven ? "done" : "lit") : "") + "'></i>"; }).join(""); }
-    function hud(tau, ph, dc, driven, finished) {
+    function hud(tau, ph, dc, driven, finished, cfg) {
+      var Ta = cfg.Ta;
       $("s6t").textContent = tau.toFixed(1) + " s"; $("s6card").textContent = String(ph.i + 1);
-      $("s6do").textContent = finished ? (lastDrive.hit ? "dented" : "delivered") : ph.kind === "think" ? "thinking " + (dc.think >= 1 ? fmt(dc.think, 0) + " s" : fmt(dc.think * 1000, 0) + " ms") : "pin " + Math.min(driven + 1, o.Ta) + " / " + o.Ta;
+      $("s6do").textContent = finished ? (lastDrive.hit ? "dented" : "delivered") : ph.kind === "think" ? "thinking " + (dc.think >= 1 ? fmt(dc.think, 0) + " s" : fmt(dc.think * 1000, 0) + " ms") : "pin " + Math.min(driven + 1, Ta) + " / " + Ta;
       $("s6dent").textContent = finished && lastDrive.hit ? "1" : "0";
-      pinsRow(dc, driven, o.Ta);
+      pinsRow(dc, driven, Ta);
       var seesCart = Math.abs(dc.obsFx - dc.realFx) < 1e-9;
       $("s6st").className = "status" + (finished && lastDrive.hit ? " hit" : "");
-      $("s6st").innerHTML = finished ? (lastDrive.hit ? "<b>Dent.</b> " + lastDrive.decisions.length + " cards, " + lastDrive.time.toFixed(1) + " s, " + lastDrive.flips + " side flip" + (lastDrive.flips === 1 ? "" : "s") + "." : "<b>Delivered.</b> " + lastDrive.decisions.length + " cards, " + lastDrive.time.toFixed(1) + " s, " + lastDrive.flips + " side flip" + (lastDrive.flips === 1 ? "" : "s") + ".") : "card " + (ph.i + 1) + ": the cartographer " + (seesCart ? "sees the cart at " + sgn(dc.obsFx, 1) : "<b>thinks</b> the cart is at " + sgn(dc.obsFx, 1) + " (it's at " + sgn(dc.realFx, 1) + ")") + " · " + (dc.side < 0 ? "going left" : "going right");
+      $("s6st").innerHTML = finished ? (lastDrive.hit ? "<b>Dent.</b> " + lastDrive.decisions.length + " cards, " + lastDrive.time.toFixed(1) + " s, " + lastDrive.flips + " side flip" + (lastDrive.flips === 1 ? "" : "s") + "." : "<b>Delivered.</b> " + lastDrive.decisions.length + " cards, " + lastDrive.time.toFixed(1) + " s, " + lastDrive.flips + " side flip" + (lastDrive.flips === 1 ? "" : "s") + ".") : "card " + (ph.i + 1) + ": the cartographer " + (seesCart ? "sees the cart at " + sgn(dc.obsFx, 1) : "<b>thinks</b> the cart is at " + sgn(dc.obsFx, 1) + " (it's at " + sgn(dc.realFx, 1) + ")") + " · " + (dc.side < 0 ? "going left" : dc.side > 0 ? "going right" : "straight through");
     }
     function drive() {
       if (running) running.stop();
@@ -481,7 +485,7 @@
       ],
       causes: [{ label: "Re-planning every pin lets each fresh sample pick a side while the fork is still 50/50", right: true }, { label: "Too few passes per card" }, { label: "The fog schedule is wrong" }],
       checks: [{ label: "20 drives, side flips per drive ≤ 0.5", test: function (f) { return f.flips <= 0.5; }, why: function (f) { return fmt(f.flips, 2) + " flips per drive"; } }, { label: "20 drives, at most 1 dent", test: function (f) { return f.hits <= 1; }, why: function (f) { return f.hits + " of 20 hit the cart"; } }] },
-    { id: "c3", title: "Case 3 · the slowpoke", brief: "<b>The report:</b> on market day the vendor paces the cart back and forth across the road (0.8 either way, an 8-second round trip). The courier dents it most drives and takes 25 seconds. The rule: the cartographer draws every card with DDPM's full <b>1,000 passes</b>, 10 ms each, and the courier waits for the card.",
+    { id: "c3", title: "Case 3 · the slowpoke", brief: "<b>The report:</b> on market day the vendor paces the cart back and forth across the road (0.8 either way, an 8-second round trip). The courier dents it most drives and takes 25 seconds. The rule: the cartographer draws every card by walking the course's whole schedule, <b>1,000 passes</b> at 10 ms each, and the courier waits for the card.",
       broken: { policy: "diffusion", K: 1000, Ta: 8, lookout: true, cartAt: S.pacing(0.8, 8) },
       fixes: [
         { label: "Ten DDIM passes per card", cfg: { policy: "diffusion", K: 10, Ta: 8, lookout: true, cartAt: S.pacing(0.8, 8) }, right: true, why: "0.1 s per card: the report is fresh when the courier moves." },
@@ -512,7 +516,7 @@
         var pass = rows.every(function (r) { return r.ok; });
         $(c.id + "ch").innerHTML = rows.map(function (r) { return '<div class="check ' + (r.ok ? "ok" : "no") + '"><span class="ic">' + (r.ok ? "✓" : "✗") + '</span><div>' + r.label + '<div class="why">' + r.why + "</div></div></div>"; }).join("") +
           '<div class="callout ' + (pass ? "co-g" : "co-r") + '"><b>' + (pass ? "Fixed." : "Not fixed.") + "</b> " + esc(fix.why) + "</div>";
-        store.cap[c.id] = pass; save(); grade();
+        store.cap[c.id] = store.cap[c.id] || pass; save(); grade();   // a star, once earned, stays
       };
     });
     grade();
@@ -522,12 +526,12 @@
   var FT = [
     { q: "Cosine schedule: at which t does the map become half fog (ᾱ crosses 0.5)?", hint: "step 1", ans: 496, tol: 12 },
     { q: "Linear schedule: at which t?", hint: "step 1", ans: 259, tol: 12 },
-    { q: "One pass from pure fog: what percent of the 600 routes end inside the cart?", hint: "step 3, %", ans: 100, tol: 1 },
+    { q: "One pass from pure fog: what percent of the 600 pins end inside the cart?", hint: "step 3, %", ans: 100, tol: 1 },
     { q: "Five passes, cosine, DDIM η = 0: what percent inside the cart?", hint: "step 3, %", ans: 2, tol: 2 },
     { q: "Linear schedule, two passes: what percent inside the cart?", hint: "step 3, %", ans: 94, tol: 4 },
-    { q: "10 ms per pass, a new card every 50 ms (20 Hz): how many passes fit?", hint: "step 4", ans: 5, tol: 0 },
+    { q: "10 ms per pass and a card of 4 pins: how many passes fit before drawing the card takes longer than driving it?", hint: "step 4", ans: 40, tol: 0 },
     { q: "Cart parked at +1.0, cartographer blindfolded, 10 passes: what percent inside the cart?", hint: "step 5, %", ans: 28, tol: 5 },
-    { q: "Re-plan after every pin (Ta = 1), 20 drives: side flips per drive?", hint: "step 6, Drive 20 in a row", ans: 1.9, tol: 0.5 }
+    { q: "The cartographer, 10 passes, lookout on, no push, cart at 0.0, re-planning after every pin (Ta = 1): side flips per drive over 20 drives?", hint: "step 6, Drive 20 in a row", ans: 1.9, tol: 0.5 }
   ];
   function initFT() {
     $("ftqs").innerHTML = FT.map(function (f, i) { return '<div class="fq"><div class="fqt"><b>' + (i + 1) + ".</b> " + f.q + ' <span class="muted">(' + f.hint + ')</span></div><div class="row"><input type="number" id="ft' + i + '" step="any" value="' + (store.ft[i] != null ? esc(store.ft[i]) : "") + '"><span class="res" id="ftr' + i + '"></span></div></div>'; }).join("");
