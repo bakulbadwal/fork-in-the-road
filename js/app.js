@@ -26,7 +26,7 @@
   var COL = { left: "#246A9C", right: "#D9771E", cart: "#A5321F", fog: "#B9BDC2", ink: "#3A2418", line: "#4A2E1E" };
 
   /* ---------------- nav ---------------- */
-  var NAV_ICON = { s0: "square", s1: "fog", s2: "map", s3: "passes", s4: "watch", s5: "spyglass", s6: "card", cap: "star", ft: "pencil" };
+  var NAV_ICON = { s0: "square", s1: "fog", s2: "map", s3: "passes", s4: "watch", s5: "spyglass", s6: "card", s7: "arrow", cap: "star", ft: "pencil" };
   var sections = qa("section");
   function buildNav() {
     var nav = $("nav"); nav.innerHTML = "";
@@ -132,47 +132,106 @@
   }
   var ease = function (u) { return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2; };
 
-  /* ---------------- the map canvas ---------------- */
+  /* ---------------- the map canvas: the square, drawn in the scenes' language ---------------- */
+  var FOG_BANKS = [[-1.9, 1.6, 0.62], [-0.7, 1.9, 0.5], [0.9, 1.7, 0.58], [2.0, 1.1, 0.5], [-2.1, 0.3, 0.55], [-0.9, 0.6, 0.62], [0.6, 0.4, 0.5], [1.9, -0.2, 0.6],
+    [-1.6, -0.9, 0.55], [-0.2, -0.8, 0.62], [1.2, -1.1, 0.55], [-2.0, -2.0, 0.6], [-0.6, -2.1, 0.5], [0.9, -2.2, 0.58], [2.1, -1.6, 0.5], [0.1, 1.0, 0.45], [-1.3, 2.4, 0.45], [1.6, 2.5, 0.45], [0.2, -2.9, 0.5], [-2.4, 1.4, 0.45]];
   function SquareView(id) {
-    var c = $(id), ctx = c.getContext("2d"), W = 0, H = 0, V = S.VIEW;
+    var c = $(id), ctx = c.getContext("2d"), W = 0, H = 0, V = S.VIEW, bg = null, bgKey = "";
+    var SIGNF = "'Grandstander', 'Patrick Hand', sans-serif", HANDF = "'Patrick Hand', sans-serif";
     function fit() {
       var r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1, w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
       if (c.width !== Math.round(w * d) || c.height !== Math.round(h * d)) { c.width = Math.round(w * d); c.height = Math.round(h * d); }
       ctx.setTransform(d, 0, 0, d, 0, 0); W = w; H = h;
     }
-    var X = function (x) { return (x + V) / (2 * V) * W; }, Y = function (y) { return (V - y) / (2 * V) * H; };
+    var X = function (x) { return (x + V) / (2 * V) * W; }, Y = function (y) { return (V - y) / (2 * V) * H; }, PX = function (u) { return u / (2 * V) * W; };
+    function box(g, x0, y0, x1, y1, fill) { var L = X(x0), T = Y(y1), w = X(x1) - L, h = Y(y0) - T; g.fillStyle = fill; g.fillRect(L, T, w, h); g.strokeRect(L, T, w, h); return { L: L, T: T, w: w, h: h, R: L + w, B: T + h }; }
+    // a Busytown storefront in elevation, in world coordinates
+    function storefront(g, x0, y0, x1, y1, col, awn) {
+      g.strokeStyle = COL.line; g.lineWidth = Math.max(1.2, W / 360);
+      var b = box(g, x0, y0, x1, y1, col), w = b.w, h = b.h;
+      g.fillStyle = "#B8793F"; g.fillRect(b.L - w * 0.06, b.T - h * 0.07, w * 1.12, h * 0.08); g.strokeRect(b.L - w * 0.06, b.T - h * 0.07, w * 1.12, h * 0.08);
+      g.fillStyle = "#9CCBEA"; [0.14, 0.6].forEach(function (u) { g.fillRect(b.L + w * u, b.T + h * 0.12, w * 0.26, h * 0.16); g.strokeRect(b.L + w * u, b.T + h * 0.12, w * 0.26, h * 0.16); });
+      var ay = b.B - h * 0.36, n = Math.max(3, Math.round(w / 9)), zz = h * 0.06;
+      g.fillStyle = awn; g.beginPath(); g.moveTo(b.L, ay); g.lineTo(b.R, ay); g.lineTo(b.R, ay + zz);
+      for (var i = n; i > 0; i--) { g.lineTo(b.L + (i - 0.5) * w / n, ay + zz * 2); g.lineTo(b.L + (i - 1) * w / n, ay + zz); }
+      g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = "#B8793F"; g.fillRect(b.L + w * 0.36, b.B - h * 0.26, w * 0.28, h * 0.26); g.strokeRect(b.L + w * 0.36, b.B - h * 0.26, w * 0.28, h * 0.26);
+    }
+    function drawStatic(g) {
+      g.fillStyle = "#EAD9B6"; g.fillRect(0, 0, W, H);
+      var r = 3; g.strokeStyle = "#DDBB8A"; g.lineWidth = Math.max(1.5, W / 240); g.lineCap = "round";
+      for (var i = 0; i < 150; i++) { r = (r * 9301 + 49297) % 233280; var cx = (r / 233280) * W; r = (r * 9301 + 49297) % 233280; var cy = (r / 233280) * H; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + W / 80, cy); g.stroke(); }
+      g.lineCap = "butt"; g.strokeStyle = COL.line; g.lineWidth = Math.max(1.2, W / 360);
+      box(g, -0.5, -V, 0.5, V, "#DDBB8A");
+      g.strokeStyle = "#FBF7EC"; g.lineWidth = Math.max(1.5, W / 260); g.setLineDash([PX(0.25), PX(0.22)]); g.beginPath(); g.moveTo(X(0), 0); g.lineTo(X(0), H); g.stroke(); g.setLineDash([]);
+      storefront(g, -3.05, 1.05, -2.3, 2.55, "#C8452F", "#5FA03C"); storefront(g, -3.05, -2.4, -2.3, -0.95, "#B8A3DC", "#9CCBEA");
+      storefront(g, 2.3, 1.05, 3.05, 2.55, "#9CCBEA", "#C8452F"); storefront(g, 2.3, -2.4, 3.05, -0.95, "#5FA03C", "#F4C430");
+      // a tree between the left storefronts, a bench between the right ones
+      g.strokeStyle = COL.line; g.lineWidth = Math.max(1.2, W / 360);
+      g.fillStyle = "#B8793F"; g.fillRect(X(-2.72), Y(0.05), PX(0.14), PX(0.5)); g.strokeRect(X(-2.72), Y(0.05), PX(0.14), PX(0.5));
+      g.fillStyle = "#5FA03C"; g.beginPath(); g.arc(X(-2.65), Y(0.35), PX(0.34), 0, 7); g.fill(); g.stroke(); g.beginPath(); g.arc(X(-2.85), Y(0.12), PX(0.2), 0, 7); g.fill(); g.stroke();
+      g.fillStyle = "#B8793F"; g.fillRect(X(2.38), Y(0.1), PX(0.55), PX(0.1)); g.strokeRect(X(2.38), Y(0.1), PX(0.55), PX(0.1)); g.fillRect(X(2.44), Y(0), PX(0.06), PX(0.16)); g.fillRect(X(2.82), Y(0), PX(0.06), PX(0.16));
+      // depot and bakery
+      g.strokeStyle = COL.line; g.lineWidth = Math.max(1.5, W / 300);
+      box(g, -0.62, -V - 0.1, 0.62, S.START_Y, "#B9BDC2"); box(g, -0.62, S.GOAL_Y, 0.62, V + 0.1, "#5FA03C");
+      g.font = "800 " + Math.max(9, Math.round(W / 40)) + "px " + SIGNF; g.textAlign = "center";
+      g.fillStyle = COL.ink; g.fillText("DEPOT", X(0), H - Math.max(4, W / 110)); g.fillStyle = "#FBF7EC"; g.fillText("BAKERY", X(0), Y(S.GOAL_Y) - Math.max(3, W / 130));
+    }
+    function ensureBg() {
+      var key = W + "x" + H; if (bg && bgKey === key) return;
+      var d = window.devicePixelRatio || 1; bg = document.createElement("canvas"); bg.width = Math.round(W * d); bg.height = Math.round(H * d);
+      var g = bg.getContext("2d"); g.setTransform(d, 0, 0, d, 0, 0); drawStatic(g); bgKey = key;
+    }
+    // the pretzel cart: wooden body, wheels, posts, a striped awning and its sign
     function cartBox(fx, ghost) {
       var x0 = X(fx - S.CART.hw), y0 = Y(S.CART.hh), w = X(fx + S.CART.hw) - x0, h = Y(-S.CART.hh) - y0;
-      if (ghost) { ctx.setLineDash([6, 5]); ctx.strokeStyle = COL.fog; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, w, h); ctx.setLineDash([]); return; }
-      ctx.fillStyle = "#B8793F"; ctx.strokeStyle = COL.line; ctx.lineWidth = 2; ctx.fillRect(x0, y0, w, h); ctx.strokeRect(x0, y0, w, h);
-      var band = Math.max(8, h * 0.22), n = Math.max(2, Math.round(w / 12));
+      if (ghost) {
+        ctx.setLineDash([6, 5]); ctx.strokeStyle = "rgba(74,46,30,.45)"; ctx.lineWidth = 2; ctx.strokeRect(x0, y0, w, h); ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(74,46,30,.6)"; ctx.font = "400 " + Math.max(9, Math.round(W / 46)) + "px " + HANDF; ctx.textAlign = "center"; ctx.fillText("was here", x0 + w / 2, y0 + h + Math.max(10, W / 40));
+        return;
+      }
+      ctx.strokeStyle = COL.line; ctx.lineWidth = Math.max(1.5, W / 300);
+      var band = h * 0.24, body0 = y0 + band + h * 0.1;
+      ctx.fillStyle = "#B8793F"; ctx.fillRect(x0 + w * 0.04, body0, w * 0.92, h - band - h * 0.1 - h * 0.12); ctx.strokeRect(x0 + w * 0.04, body0, w * 0.92, h - band - h * 0.1 - h * 0.12);
+      ctx.beginPath(); ctx.moveTo(x0 + w * 0.04, body0 + (h - band) * 0.42); ctx.lineTo(x0 + w * 0.96, body0 + (h - band) * 0.42); ctx.stroke();
+      ctx.fillStyle = "#DDBB8A"; [0.27, 0.73].forEach(function (u) { ctx.beginPath(); ctx.arc(x0 + w * u, y0 + h - h * 0.12, h * 0.12, 0, 7); ctx.fill(); ctx.stroke(); ctx.fillStyle = COL.line; ctx.beginPath(); ctx.arc(x0 + w * u, y0 + h - h * 0.12, h * 0.035, 0, 7); ctx.fill(); ctx.fillStyle = "#DDBB8A"; });
+      ctx.beginPath(); ctx.moveTo(x0 + w * 0.1, body0); ctx.lineTo(x0 + w * 0.1, y0 + band); ctx.moveTo(x0 + w * 0.9, body0); ctx.lineTo(x0 + w * 0.9, y0 + band); ctx.stroke();
+      var n = Math.max(4, Math.round(w / 9));
       for (var i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? "#FBF7EC" : "#C8452F"; ctx.fillRect(x0 + i * w / n, y0, w / n + 0.5, band); }
       ctx.strokeRect(x0, y0, w, band);
-      ctx.fillStyle = "#FFFDF6"; ctx.font = "600 " + Math.max(9, Math.round(W / 42)) + "px 'Grandstander', 'Patrick Hand', sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("PRETZELS", x0 + w / 2, y0 + h * 0.65);
+      ctx.fillStyle = "#FFFDF6"; ctx.fillRect(x0 + w * 0.18, y0 + band + h * 0.02, w * 0.64, h * 0.1); ctx.strokeRect(x0 + w * 0.18, y0 + band + h * 0.02, w * 0.64, h * 0.1);
+      ctx.fillStyle = COL.ink; ctx.font = "800 " + Math.max(7, Math.round(W / 70)) + "px " + SIGNF; ctx.textAlign = "center"; ctx.fillText("PRETZELS", x0 + w / 2, y0 + band + h * 0.1);
     }
+    // the courier: a crate on a rounded body, a yellow stripe, two wheels, a face plate and an antenna
     function courierGlyph(x, y, o) {
       o = o || {}; var s = Math.max(10, W / 30), px = X(x), py = Y(y);
-      ctx.fillStyle = COL.line; ctx.beginPath(); ctx.arc(px - s * 0.5, py + s * 0.35, s * 0.28, 0, 7); ctx.arc(px + s * 0.5, py + s * 0.35, s * 0.28, 0, 7); ctx.fill();
-      ctx.fillStyle = o.dizzy ? "#F4B7A7" : "#B9BDC2"; ctx.strokeStyle = COL.line; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.roundRect(px - s, py - s * 0.35, 2 * s, s * 0.8, s * 0.25); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = COL.line; ctx.lineWidth = Math.max(1.5, W / 300);
+      ctx.fillStyle = "#B8793F"; ctx.fillRect(px - s * 0.75, py - s * 0.95, s * 0.9, s * 0.6); ctx.strokeRect(px - s * 0.75, py - s * 0.95, s * 0.9, s * 0.6);
+      ctx.beginPath(); ctx.moveTo(px - s * 0.3, py - s * 0.95); ctx.lineTo(px - s * 0.3, py - s * 0.35); ctx.stroke();
+      ctx.fillStyle = o.dizzy ? "#F4B7A7" : "#B9BDC2"; ctx.beginPath(); ctx.roundRect(px - s, py - s * 0.35, 2 * s, s * 0.8, s * 0.25); ctx.fill(); ctx.stroke();
       ctx.fillStyle = "#F4C430"; ctx.fillRect(px - s, py + s * 0.05, 2 * s, s * 0.18);
-      ctx.fillStyle = "#B8793F"; ctx.fillRect(px - s * 0.7, py - s * 0.9, s * 0.9, s * 0.55); ctx.strokeRect(px - s * 0.7, py - s * 0.9, s * 0.9, s * 0.55);
+      ctx.fillStyle = COL.line; [-0.5, 0.5].forEach(function (u) { ctx.beginPath(); ctx.arc(px + s * u, py + s * 0.42, s * 0.28, 0, 7); ctx.fill(); ctx.fillStyle = "#B9BDC2"; ctx.beginPath(); ctx.arc(px + s * u, py + s * 0.42, s * 0.1, 0, 7); ctx.fill(); ctx.fillStyle = COL.line; });
       ctx.fillStyle = "#FFFDF6"; ctx.fillRect(px + s * 0.35, py - s * 0.8, s * 0.55, s * 0.45); ctx.strokeRect(px + s * 0.35, py - s * 0.8, s * 0.55, s * 0.45);
-      ctx.fillStyle = COL.line; ctx.beginPath(); ctx.arc(px + s * 0.5, py - s * 0.58, s * 0.06, 0, 7); ctx.arc(px + s * 0.75, py - s * 0.58, s * 0.06, 0, 7); ctx.fill();
+      ctx.fillStyle = COL.line; ctx.beginPath(); ctx.arc(px + s * 0.5, py - s * 0.62, s * 0.06, 0, 7); ctx.arc(px + s * 0.75, py - s * 0.62, s * 0.06, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(px + s * 0.52, py - s * 0.48); ctx.quadraticCurveTo(px + s * 0.62, py - s * 0.4, px + s * 0.73, py - s * 0.48); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px + s * 0.1, py - s * 0.95); ctx.lineTo(px + s * 0.1, py - s * 1.3); ctx.stroke();
+      ctx.fillStyle = "#C8452F"; ctx.beginPath(); ctx.arc(px + s * 0.1, py - s * 1.38, s * 0.1, 0, 7); ctx.fill(); ctx.stroke();
+    }
+    function fogLayer(alpha) {
+      if (!(alpha > 0.01)) return;
+      ctx.globalAlpha = Math.min(1, alpha) * 0.82; ctx.strokeStyle = "rgba(74,46,30,.55)"; ctx.lineWidth = 1.2;
+      FOG_BANKS.forEach(function (b) { ctx.fillStyle = "#EEF3F6"; ctx.beginPath(); ctx.arc(X(b[0]), Y(b[1]), PX(b[2]), 0, 7); ctx.fill(); ctx.stroke(); });
+      ctx.globalAlpha = 1;
+    }
+    function paperLabel(text) {
+      ctx.font = "400 " + Math.max(11, Math.round(W / 32)) + "px " + HANDF; ctx.textAlign = "left";
+      var w = ctx.measureText(text).width + 14, h = Math.max(18, W / 20);
+      ctx.fillStyle = "#FFFDF6"; ctx.strokeStyle = COL.line; ctx.lineWidth = 1.5; ctx.fillRect(6, 6, w, h); ctx.strokeRect(6, 6, w, h);
+      ctx.fillStyle = COL.ink; ctx.fillText(text, 13, 6 + h * 0.72);
     }
     function dot(x, y, col, r) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(X(x), Y(y), r || Math.max(2, W / 200), 0, 7); ctx.fill(); }
     function render(st) {
-      fit();
-      ctx.fillStyle = css("--cobble") || "#EAD9B6"; ctx.fillRect(0, 0, W, H);
-      ctx.strokeStyle = "rgba(74,46,30,.12)"; ctx.lineWidth = 1;
-      for (var g = -3; g <= 3; g++) { ctx.beginPath(); ctx.moveTo(X(g), 0); ctx.lineTo(X(g), H); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, Y(g)); ctx.lineTo(W, Y(g)); ctx.stroke(); }
-      ctx.fillStyle = "#DDBB8A"; ctx.fillRect(X(-0.5), 0, X(0.5) - X(-0.5), H);
-      ctx.strokeStyle = "#FBF7EC"; ctx.lineWidth = 2; ctx.setLineDash([8, 8]); ctx.beginPath(); ctx.moveTo(X(0), 0); ctx.lineTo(X(0), H); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = "#B9BDC2"; ctx.strokeStyle = COL.line; ctx.lineWidth = 2; ctx.fillRect(X(-0.6), Y(S.START_Y) - 2, X(0.6) - X(-0.6), H - Y(S.START_Y) + 2); ctx.strokeRect(X(-0.6), Y(S.START_Y) - 2, X(0.6) - X(-0.6), H - Y(S.START_Y) + 2);
-      ctx.fillStyle = "#5FA03C"; ctx.fillRect(X(-0.6), -2, X(0.6) - X(-0.6), Y(S.GOAL_Y) + 2); ctx.strokeRect(X(-0.6), -2, X(0.6) - X(-0.6), Y(S.GOAL_Y) + 2);
-      ctx.font = "800 " + Math.max(9, Math.round(W / 40)) + "px 'Grandstander', 'Patrick Hand', sans-serif"; ctx.textAlign = "center";
-      ctx.fillStyle = COL.ink; ctx.fillText("DEPOT", X(0), H - 5); ctx.fillStyle = "#FBF7EC"; ctx.fillText("BAKERY", X(0), Y(S.GOAL_Y) - 4);
+      fit(); ensureBg(); ctx.drawImage(bg, 0, 0, W, H);
       var fx = st.fx == null ? 0 : st.fx;
       if (st.routes) {
         [-1, 1].forEach(function (sd) {
@@ -184,6 +243,18 @@
       if (st.ghost != null && Math.abs(st.ghost - fx) > 1e-6) cartBox(st.ghost, true);
       cartBox(fx);
       if (st.avg) { ctx.strokeStyle = COL.cart; ctx.lineWidth = 3; ctx.setLineDash([10, 6]); ctx.beginPath(); ctx.moveTo(X(st.avg[0]), Y(S.START_Y)); ctx.lineTo(X(st.avg[0]), Y(S.GOAL_Y)); ctx.stroke(); ctx.setLineDash([]); }
+      fogLayer(st.fog || 0);
+      if (st.field) {
+        ctx.strokeStyle = COL.left; ctx.fillStyle = COL.left; ctx.lineWidth = Math.max(1, W / 400); ctx.globalAlpha = 0.85;
+        st.field.forEach(function (a) {
+          var m = Math.sqrt(a.vx * a.vx + a.vy * a.vy); if (m < 1e-9) return;
+          var len = Math.min(0.34, m * 0.11), ux = a.vx / m, uy = a.vy / m, x1 = a.x + ux * len, y1 = a.y + uy * len;
+          ctx.beginPath(); ctx.moveTo(X(a.x), Y(a.y)); ctx.lineTo(X(x1), Y(y1)); ctx.stroke();
+          var hx = X(x1), hy = Y(y1), hs = Math.max(3, W / 120);
+          ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx - ux * hs + uy * hs * 0.6, hy + uy * hs + ux * hs * 0.6); ctx.lineTo(hx - ux * hs - uy * hs * 0.6, hy + uy * hs - ux * hs * 0.6); ctx.closePath(); ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+      }
       if (st.trails) { ctx.lineWidth = 1.2; ctx.globalAlpha = 0.6; st.trails.forEach(function (tr) { ctx.strokeStyle = tr.col || COL.fog; ctx.beginPath(); tr.pts.forEach(function (p, i) { if (i) ctx.lineTo(X(p[0]), Y(p[1])); else ctx.moveTo(X(p[0]), Y(p[1])); }); ctx.stroke(); }); ctx.globalAlpha = 1; }
       if (st.arrows) { ctx.strokeStyle = "rgba(74,46,30,.35)"; ctx.lineWidth = 1; st.arrows.forEach(function (a) { ctx.beginPath(); ctx.moveTo(X(a[0]), Y(a[1])); ctx.lineTo(X(a[2]), Y(a[3])); ctx.stroke(); }); }
       if (st.pts) { ctx.globalAlpha = st.ptsAlpha || 0.85; st.pts.forEach(function (p) { dot(p.x, p.y, p.col, p.r); }); ctx.globalAlpha = 1; }
@@ -192,7 +263,7 @@
       if (st.pins) { st.pins.forEach(function (p) { ctx.fillStyle = p.state === "lit" ? "#F4C430" : p.state === "done" ? "#5FA03C" : "#FFFDF6"; ctx.strokeStyle = COL.line; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), Math.max(3, W / 90), 0, 7); ctx.fill(); ctx.stroke(); }); }
       if (st.courier) courierGlyph(st.courier.x, st.courier.y, st.courier);
       if (st.flash) { ctx.fillStyle = "rgba(200,69,47,.18)"; ctx.fillRect(0, 0, W, H); }
-      if (st.caption) { ctx.fillStyle = COL.ink; ctx.font = "400 " + Math.max(11, Math.round(W / 32)) + "px 'Patrick Hand', sans-serif"; ctx.textAlign = "left"; ctx.fillText(st.caption, 8, 20); }
+      if (st.caption) paperLabel(st.caption);
     }
     return { render: render, canvas: c };
   }
@@ -268,7 +339,7 @@
     function draw() {
       var sch = SCH[schName], ab = FR.abAt(sch, t), a = Math.sqrt(ab), b = Math.sqrt(1 - ab), swapped = 0;
       var pts = DEMOS.map(function (p) { var x = a * p.x0 + b * p.ex, y = a * p.y0 + b * p.ey; if ((p.side < 0 && x > 0) || (p.side > 0 && x < 0)) swapped++; return { x: x, y: y, col: p.side < 0 ? COL.left : COL.right }; });
-      view.render({ fx: 0, pts: pts, caption: "t = " + t });
+      view.render({ fx: 0, pts: pts, fog: b, caption: "t = " + t });
       $("s1tv").textContent = t; $("s1a").textContent = a.toFixed(2); $("s1b").textContent = b.toFixed(2); $("s1swap").textContent = pct(swapped / DEMOS.length); $("s1half").textContent = halfFog(sch);
       $("s1m").innerHTML = "one dot: x₀ = (" + sgn(p0.x0) + ", " + sgn(p0.y0) + ") · ε = (" + sgn(p0.ex) + ", " + sgn(p0.ey) + ")<br>x<sub>" + t + "</sub> = <b>" + a.toFixed(2) + "</b> × x₀ + <b>" + b.toFixed(2) + "</b> × ε = (<b>" + sgn(a * p0.x0 + b * p0.ex) + "</b>, <b>" + sgn(a * p0.y0 + b * p0.ey) + "</b>)";
       drawSchedule("s1chart", sch, t);
@@ -290,7 +361,7 @@
         pts.push({ x: xt[0], y: xt[1], col: COL.fog, r: 2 }); pts.push({ x: d.x0[0], y: d.x0[1], col: classCol(cl) });
         if ($("s2arr").checked) arrows.push([xt[0], xt[1], d.x0[0], d.x0[1]]);
       });
-      view.render({ fx: 0, pts: pts, arrows: arrows, caption: "t = " + t });
+      view.render({ fx: 0, pts: pts, arrows: arrows, fog: b * 0.5, caption: "t = " + t });
       $("s2tv").textContent = t; $("s2l").textContent = pct(n.left / DEMOS.length); $("s2r").textContent = pct(n.right / DEMOS.length); $("s2cart").textContent = pct(n.cart / DEMOS.length);
       var wl = 0, wr = 0; comps.forEach(function (c, k) { if (c.side < 0) wl += d0.d.w[k]; else wr += d0.d.w[k]; });
       $("s2m").innerHTML = "foggy dot x<sub>t</sub> = (" + sgn(d0.xt[0]) + ", " + sgn(d0.xt[1]) + ") at t = " + t + "<br>weight on the left routes <b>" + wl.toFixed(2) + "</b> · on the right routes <b>" + wr.toFixed(2) + "</b><br>her guess x̂₀ = (<b>" + sgn(d0.d.x0[0]) + "</b>, <b>" + sgn(d0.d.x0[1]) + "</b>) → " + S.classify(d0.d.x0[0], d0.d.x0[1], 0);
@@ -333,7 +404,7 @@
       var pts = chains.map(function (c) { var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)], x = a[0] + (b2[0] - a[0]) * u, y = a[1] + (b2[1] - a[1]) * u; return { x: x, y: y, col: done ? cl(c) : COL.fog }; });
       var trails = $("s3trail").checked ? chains.slice(0, 30).map(function (c) { var tp = c.trail.slice(0, pass + 1).map(function (p) { return [p[0], p[1]]; }); var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)]; tp.push([a[0] + (b2[0] - a[0]) * u, a[1] + (b2[1] - a[1]) * u]); return { pts: tp, col: done ? cl(c) : COL.fog }; }) : null;
       var guess = $("s3guess").checked && !done ? chains.map(function (c) { return c.guesses[Math.min(pass, c.guesses.length - 1)]; }) : null;
-      view.render({ fx: 0, routes: done, pts: pts, trails: trails, guess: guess, caption: done ? run.K + " pass" + (run.K > 1 ? "es" : "") + " · " + (run.eta ? "DDPM-like η = 1" : "DDIM η = 0") + " · " + run.sch : "pass " + (pass + 1) + " of " + run.K });
+      view.render({ fx: 0, routes: done, pts: pts, trails: trails, guess: guess, fog: done ? 0 : 1 - (pass + u) / run.K, caption: done ? run.K + " pass" + (run.K > 1 ? "es" : "") + " · " + (run.eta ? "DDPM-like η = 1" : "DDIM η = 0") + " · " + run.sch : "pass " + (pass + 1) + " of " + run.K });
     }
     $("s3go").onclick = function () {
       if (running) running.stop();
@@ -423,7 +494,7 @@
       var ph = phases[k], dur = Math.max(1, ph.r1 - ph.r0);
       return anim(dur, function (u) { render(ph, u); }, function () { k++; next(); });
     }
-    if (REDUCED) { render(phases[phases.length - 1], 1); if (onDone) onDone(); return { stop: function () {} }; }
+    if (REDUCED) { var first = /[?&]phase=0/.test(location.search); render(phases[first ? 0 : phases.length - 1], first ? 0 : 1); if (onDone) onDone(); return { stop: function () {} }; }
     var h = { stopped: false }, cur = null;
     (function loop() { if (h.stopped || k >= phases.length) { if (!h.stopped && onDone) onDone(); return; } var ph = phases[k]; cur = anim(Math.max(1, ph.r1 - ph.r0), function (u) { render(ph, u); }, function () { k++; loop(); }); })();
     h.stop = function () { h.stopped = true; if (cur) cur.stop(); };
@@ -453,7 +524,7 @@
       $("s6fa").textContent = (f.n - f.hits) + " / 20"; $("s6fh").textContent = f.hits + " / 20"; $("s6ff").textContent = fmt(f.flips, 2); $("s6ftm").textContent = fmt(f.time, 1);
       touch("s6");
     }
-    seg($("s6pol"), [{ v: "diffusion", label: "the cartographer (diffusion)" }, { v: "averager", label: "the clerk (average)" }], o.policy, function (v) { o.policy = v; });
+    seg($("s6pol"), [{ v: "diffusion", label: "the cartographer (diffusion, DDIM)" }, { v: "flow", label: "the cartographer (arrows, flow matching)" }, { v: "averager", label: "the clerk (average)" }], o.policy, function (v) { o.policy = v; });
     seg($("s6k"), [1, 2, 5, 10, 50].map(function (k) { return { v: k, label: String(k) }; }), o.K, function (v) { o.K = +v; });
     seg($("s6ta"), [1, 4, 8, 16].map(function (k) { return { v: k, label: String(k) }; }), o.Ta, function (v) { o.Ta = +v; });
     $("s6look").addEventListener("change", function () { o.lookout = this.checked; });
@@ -463,6 +534,58 @@
     idle();
     redraws.push(function () { if ($("s6").classList.contains("on") && !running) idle(); });
     window.FRDrive = { drive: drive, fleet: fleet, set: function (k, v) { o[k] = v; } };
+  }
+
+  /* ================= STEP 7: arrows, not guesses (flow matching) ================= */
+  var FLOW_K = [1, 2, 3, 4, 5, 10, 20, 50], flowLadder = null;
+  function initS7() {
+    var vf = SquareView("s7f"), vd = SquareView("s7d"), vw = SquareView("s7w"), t = 0, K = 4, running = null, last = null, comps = S.map2d(0);
+    function field() {
+      var t2 = Math.min(t, 0.95), arrows = [], step = 0.4;
+      for (var gx = -2.6; gx <= 2.61; gx += step) for (var gy = -2.6; gy <= 2.61; gy += step) { var f = FR.flowVelocity([gx, gy], t2, comps, S.BASIS2); arrows.push({ x: gx, y: gy, vx: f.v[0], vy: f.v[1] }); }
+      var pts = DEMOS.map(function (p) { return { x: (1 - t2) * p.ex + t2 * p.x0, y: (1 - t2) * p.ey + t2 * p.y0, col: p.side < 0 ? COL.left : COL.right }; });
+      vf.render({ fx: 0, pts: pts, field: arrows, fog: 1 - t2, caption: "t = " + t2.toFixed(2) + (t2 === 0 ? " · pure fog" : "") });
+      $("s7tv").textContent = t2.toFixed(2);
+      var p0 = DEMOS[0], xt = [(1 - t2) * p0.ex + t2 * p0.x0, (1 - t2) * p0.ey + t2 * p0.y0], f0 = FR.flowVelocity(xt, t2, comps, S.BASIS2);
+      $("s7m").innerHTML = "one dot: ε = (" + sgn(p0.ex) + ", " + sgn(p0.ey) + ") · x₁ = (" + sgn(p0.x0) + ", " + sgn(p0.y0) + ") · x<sub>t</sub> = (1 − t)·ε + t·x₁ = (" + sgn(xt[0]) + ", " + sgn(xt[1]) + ")<br>her arrow v = (E[x₁ | x<sub>t</sub>] − x<sub>t</sub>) ÷ (1 − t) = (<b>" + sgn(f0.v[0]) + "</b>, <b>" + sgn(f0.v[1]) + "</b>) · this dot's own straight line x₁ − ε = (<b>" + sgn(p0.x0 - p0.ex) + "</b>, <b>" + sgn(p0.y0 - p0.ey) + "</b>)";
+    }
+    $("s7t").addEventListener("input", function () { t = +this.value; field(); touch("s7"); });
+    function idle() { vd.render({ fx: 0, routes: true, caption: "DDIM · press Lift both" }); vw.render({ fx: 0, routes: true, caption: "flow matching · press Lift both" }); }
+    function ladder() {
+      if (!flowLadder) flowLadder = FLOW_K.map(function (k) { return { K: k, d: S.run2d({ K: k, eta: 0, sch: SCH.cosine, fx: 0 }), f: S.run2d({ K: k, flow: true, fx: 0 }) }; });
+      $("s7lad").innerHTML = "<tr><th>passes</th><th>DDIM · in the cart</th><th>flow · in the cart</th><th>DDIM · straightness</th><th>flow · straightness</th></tr>" + flowLadder.map(function (r) {
+        return '<tr class="' + (r.K === K ? "now" : "") + '"><td class="n">' + r.K + '</td><td class="n" style="color:' + cartCol(r.d.tally.cart) + '">' + pct(r.d.tally.cart / 600) + (r.d.tally.cart && r.d.tally.cart < 12 ? " (" + r.d.tally.cart + ")" : "") + '</td><td class="n" style="color:' + cartCol(r.f.tally.cart) + '">' + pct(r.f.tally.cart / 600) + (r.f.tally.cart && r.f.tally.cart < 12 ? " (" + r.f.tally.cart + ")" : "") + "</td><td>" + r.d.straightness.toFixed(2) + "</td><td>" + r.f.straightness.toFixed(2) + "</td></tr>";
+      }).join("");
+    }
+    function frameOne(view, run, pass, u, done, name) {
+      var chains = run.chains, cl = function (c) { return classCol(S.classify(c.x[0], c.x[1], 0, run.comps)); };
+      var pts = chains.map(function (c) { var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)]; return { x: a[0] + (b2[0] - a[0]) * u, y: a[1] + (b2[1] - a[1]) * u, col: done ? cl(c) : COL.fog }; });
+      var trails = chains.slice(0, 30).map(function (c) { var tp = c.trail.slice(0, pass + 1).map(function (p) { return [p[0], p[1]]; }); var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)]; tp.push([a[0] + (b2[0] - a[0]) * u, a[1] + (b2[1] - a[1]) * u]); return { pts: tp, col: done ? cl(c) : COL.fog }; });
+      view.render({ fx: 0, routes: done, pts: pts, trails: trails, fog: done ? 0 : 1 - (pass + u) / run.K, caption: name + " · " + (done ? run.K + " pass" + (run.K > 1 ? "es" : "") : "pass " + (pass + 1) + " of " + run.K) });
+    }
+    function stats(run) {
+      $("s7dc").textContent = pct(run.d.tally.cart / 600); $("s7wc").textContent = pct(run.f.tally.cart / 600);
+      $("s7ds").textContent = run.d.straightness.toFixed(2); $("s7ws").textContent = run.f.straightness.toFixed(2);
+      $("s7st").innerHTML = "<b>" + run.K + "</b> pass" + (run.K > 1 ? "es" : "") + " · DDIM " + run.d.tally.cart + " of 600 in the cart · flow " + run.f.tally.cart + " of 600";
+    }
+    $("s7go").onclick = function () {
+      if (running) running.stop();
+      var run = { K: K, d: S.run2d({ K: K, eta: 0, sch: SCH.cosine, fx: 0 }), f: S.run2d({ K: K, flow: true, fx: 0 }) }, pass = 0, per = Math.max(160, Math.min(800, 3000 / K));
+      run.d.K = K; run.f.K = K; last = run; $("s7go").disabled = true;
+      $("s7dc").textContent = "–"; $("s7wc").textContent = "–"; $("s7ds").textContent = "–"; $("s7ws").textContent = "–";
+      function next() {
+        $("s7st").innerHTML = "pass <b>" + (pass + 1) + " / " + run.K + "</b>";
+        running = anim(per, function (u) { frameOne(vd, run.d, pass, ease(u), false, "DDIM"); frameOne(vw, run.f, pass, ease(u), false, "flow matching"); }, function () {
+          pass++;
+          if (pass < run.K) next(); else { frameOne(vd, run.d, run.K - 1, 1, true, "DDIM"); frameOne(vw, run.f, run.K - 1, 1, true, "flow matching"); stats(run); running = null; $("s7go").disabled = false; touch("s7"); }
+        });
+      }
+      next();
+    };
+    seg($("s7k"), FLOW_K.map(function (k) { return { v: k, label: String(k) }; }), K, function (v) { K = +v; if (flowLadder) ladder(); });
+    field(); idle();
+    var drawn = false;
+    redraws.push(function () { if ($("s7").classList.contains("on")) { field(); if (!drawn) { drawn = true; ladder(); } if (last && !running) { frameOne(vd, last.d, last.K - 1, 1, true, "DDIM"); frameOne(vw, last.f, last.K - 1, 1, true, "flow matching"); } else if (!running) idle(); } });
   }
 
   /* ================= REVIEW BOARD ================= */
@@ -531,7 +654,8 @@
     { q: "Linear schedule, two passes: what percent inside the cart?", hint: "step 3, %", ans: 94, tol: 4 },
     { q: "10 ms per pass and a card of 4 pins: how many passes fit before drawing the card takes longer than driving it?", hint: "step 4", ans: 40, tol: 0 },
     { q: "Cart parked at +1.0, cartographer blindfolded, 10 passes: what percent inside the cart?", hint: "step 5, %", ans: 28, tol: 5 },
-    { q: "The cartographer, 10 passes, lookout on, no push, cart at 0.0, re-planning after every pin (Ta = 1): side flips per drive over 20 drives?", hint: "step 6, Drive 20 in a row", ans: 1.9, tol: 0.5 }
+    { q: "The cartographer, 10 passes, lookout on, no push, cart at 0.0, re-planning after every pin (Ta = 1): side flips per drive over 20 drives?", hint: "step 6, Drive 20 in a row", ans: 1.9, tol: 0.5 },
+    { q: "Flow matching, 3 Euler steps from the same fog: what percent of the 600 pins end inside the cart?", hint: "step 7, %", ans: 8, tol: 2 }
   ];
   function initFT() {
     $("ftqs").innerHTML = FT.map(function (f, i) { return '<div class="fq"><div class="fqt"><b>' + (i + 1) + ".</b> " + f.q + ' <span class="muted">(' + f.hint + ')</span></div><div class="row"><input type="number" id="ft' + i + '" step="any" value="' + (store.ft[i] != null ? esc(store.ft[i]) : "") + '"><span class="res" id="ftr' + i + '"></span></div></div>'; }).join("");
@@ -540,7 +664,7 @@
       FT.forEach(function (f, i) { var raw = $("ft" + i).value, v = parseFloat(raw), ok = raw !== "" && !isNaN(v) && Math.abs(v - f.ans) <= f.tol; store.ft[i] = raw; if (ok) score++; $("ftr" + i).innerHTML = ok ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>'; });
       save();
       $("ftscore").innerHTML = "<b>" + score + " / " + FT.length + "</b>" + (score === FT.length ? " · you can read the Diffusion Policy paper." : "");
-      if (score >= 6 && !store.said.ft) { store.said.ft = true; save(); buildNav(); markNav(); }
+      if (score >= 7 && !store.said.ft) { store.said.ft = true; save(); buildNav(); markNav(); }
     };
     $("reset").onclick = function () { try { localStorage.removeItem(KEY); } catch (e) {} history.replaceState(null, "", location.pathname); location.reload(); };
   }
@@ -563,9 +687,9 @@
   qa(".kmap .k[data-i]").forEach(function (el) { el.innerHTML = IC[el.dataset.i] || ""; });
   qa(".mast .mi").forEach(function (el) { el.innerHTML = IC.courier || ""; });
   buildNav(); buildNext();
-  function hashId() { var m = /^#\/?(s[0-6]|cap|ft)$/.exec(location.hash || ""); return m ? m[1] : null; }
+  function hashId() { var m = /^#\/?(s[0-7]|cap|ft)$/.exec(location.hash || ""); return m ? m[1] : null; }
   window.addEventListener("hashchange", function () { var id = hashId(); if (id && !$(id).classList.contains("on")) show(id); });
-  initS0(); initS1(); initS2(); initS3(); initS4(); initS5(); initS6(); initCap(); initFT();
+  initS0(); initS1(); initS2(); initS3(); initS4(); initS5(); initS6(); initS7(); initCap(); initFT();
   initTips(document); initPredicts();
   sections.forEach(function (s) { checkSay(s.id); });
   var start = hashId() || "s0";
@@ -577,6 +701,7 @@
       var run = (/[?&]run=([a-z]+)/.exec(location.search) || [])[1];
       if (run === "lift" && start === "s3") $("s3go").click();
       if (run === "drive" && start === "s6") { $("s6push").checked = true; window.FRDrive.set("push", true); $("s6go").click(); }
+      if (run === "both" && start === "s7") { var b10 = document.querySelector('#s7k button[data-v="10"]'); if (b10) b10.click(); $("s7go").click(); }
     }, 0);
   });
   window.addEventListener("resize", function () { redrawAll(); });

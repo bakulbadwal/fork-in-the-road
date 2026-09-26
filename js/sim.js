@@ -49,11 +49,14 @@
     return pts;
   }
   // Run the sampler on the 2-D map. The denoiser believes the cart is at fxSeen; the tally uses where it really is (fx).
+  // o.flow = true runs flow matching (Euler, K steps) instead of DDIM, from the same seeded fog.
   function run2d(o) {
-    var comps = map2d(o.fxSeen == null ? o.fx : o.fxSeen);
-    var res = FR.sample({ K: o.K, eta: o.eta || 0, sch: o.sch, comps: comps, basis: BASIS2, D: 2, n: o.n || 600, seed: o.seed == null ? 11 : o.seed });
-    var pts = res.map(function (c) { return c.x; });
-    return { chains: res, tally: tally(pts, o.fx, comps), comps: comps };
+    var comps = map2d(o.fxSeen == null ? o.fx : o.fxSeen), seed = o.seed == null ? 11 : o.seed;
+    var res = o.flow ? FR.flowSample({ K: o.K, comps: comps, basis: BASIS2, D: 2, n: o.n || 600, seed: seed })
+                     : FR.sample({ K: o.K, eta: o.eta || 0, sch: o.sch, comps: comps, basis: BASIS2, D: 2, n: o.n || 600, seed: seed });
+    var pts = res.map(function (c) { return c.x; }), st = 0;
+    res.forEach(function (c) { st += FR.straightness(c.trail); });
+    return { chains: res, tally: tally(pts, o.fx, comps), comps: comps, straightness: st / res.length };
   }
 
   /* ---------- the waypoint card (step 6 and the review board): 16 lateral positions ahead ---------- */
@@ -85,6 +88,11 @@
       var fxNow = cfg.cartAt(t), obsFx = cfg.lookout ? fxNow : (cfg.blindFx || 0);
       var comps = chunkComps(px, py, obsFx), chunk, think, weights = null;
       if (cfg.policy === "averager") { chunk = FR.mixtureMean(comps); think = ms / 1000; }
+      else if (cfg.policy === "flow") {
+        var xf = []; for (var fi = 0; fi < H; fi++) xf.push(r.normal());
+        for (var fs = 0; fs < K; fs++) { var fv = FR.flowVelocity(xf, fs / K, comps, BASIS16); weights = fv.w; xf = xf.map(function (v, i) { return v + fv.v[i] / K; }); }
+        chunk = xf; think = K * ms / 1000;
+      }
       else {
         var ts = FR.timesteps(K), x = []; for (var i = 0; i < H; i++) x.push(r.normal());
         for (var s = 0; s < ts.length; s++) {

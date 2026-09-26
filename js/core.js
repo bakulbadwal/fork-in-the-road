@@ -67,12 +67,14 @@
   function dot(a, b) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
 
   /* ---------- the exact denoiser ----------
-     Given x_t = √ᾱ x_0 + √(1−ᾱ) ε with x_0 ~ Σ_k π_k N(μ_k, C), returns E[x_0 | x_t] and the posterior
-     weights over components. This is the function a perfectly trained noise-prediction network converges to
-     (predicting ε and predicting x_0 are the same prediction, see epsFrom). */
-  function denoise(xt, ab, comps, basis) {
-    var D = xt.length, a = Math.sqrt(ab), b2 = 1 - ab, U = basis.U, lam = basis.lam;
-    var vj = lam.map(function (l) { return ab * l + b2; });          // variance of x_t along u_j, within a component
+     Given x = a·x_data + b·ε with x_data ~ Σ_k π_k N(μ_k, C) and ε ~ N(0, I), `posterior` returns E[x_data | x]
+     (as .x0) and the posterior weights over components. DDPM uses a = √ᾱ, b² = 1 − ᾱ (see `denoise`); flow
+     matching on the straight path uses a = t, b² = (1 − t)² (see `flowVelocity`). This is the function a
+     perfectly trained network converges to (predicting ε and predicting x_0 are the same prediction, see epsFrom). */
+  function denoise(xt, ab, comps, basis) { return posterior(xt, Math.sqrt(ab), 1 - ab, comps, basis); }
+  function posterior(xt, a, b2, comps, basis) {
+    var D = xt.length, U = basis.U, lam = basis.lam;
+    var vj = lam.map(function (l) { return a * a * l + b2; });       // variance of x along u_j, within a component
     var logdet = 0; for (var j = 0; j < D; j++) logdet += Math.log(vj[j]);
     var lw = [], cs = [], best = -Infinity, k, i;
     for (k = 0; k < comps.length; k++) {
@@ -126,6 +128,36 @@
     }
     return out;
   }
+  /* ---------- flow matching (Lipman et al. 2023; the straight "rectified" path) ----------
+     x_t = (1 − t)·ε + t·x₁ for t in [0, 1]. The network is trained to regress the velocity u = x₁ − ε; the exact
+     marginal field is v(x, t) = E[x₁ − ε | x_t = x] = (E[x₁ | x_t] − x) / (1 − t). Sampling integrates dx/dt = v
+     from t = 0 (pure noise) to t = 1 (data) with forward Euler in K equal steps; the last step lands on E[x₁ | x_t]. */
+  function flowVelocity(x, t, comps, basis) {
+    var p = posterior(x, t, (1 - t) * (1 - t), comps, basis);
+    var v = t >= 1 ? x.map(function () { return 0; }) : p.x0.map(function (m, i) { return (m - x[i]) / (1 - t); });
+    return { v: v, x1: p.x0, w: p.w };
+  }
+  function flowSample(o) {
+    var r = rng(o.seed == null ? 1 : o.seed), out = [], D = o.D, K = o.K, dt = 1 / K;
+    for (var n = 0; n < o.n; n++) {
+      var x = []; for (var i = 0; i < D; i++) x.push(r.normal());
+      var trail = [x.slice()], guesses = [], weights = [];
+      for (var s = 0; s < K; s++) {
+        var f = flowVelocity(x, s / K, o.comps, o.basis);
+        x = x.map(function (v, i) { return v + f.v[i] * dt; });
+        trail.push(x.slice()); guesses.push(f.x1); weights.push(f.w);
+      }
+      out.push({ x: x, trail: trail, guesses: guesses, weights: weights });
+    }
+    return out;
+  }
+  // How straight a sampler's path is: chord ÷ path length (1 = a straight line).
+  function straightness(trail) {
+    var len = 0, i, j, d, chord = 0;
+    for (i = 1; i < trail.length; i++) { d = 0; for (j = 0; j < trail[i].length; j++) d += Math.pow(trail[i][j] - trail[i - 1][j], 2); len += Math.sqrt(d); }
+    for (j = 0; j < trail[0].length; j++) chord += Math.pow(trail[trail.length - 1][j] - trail[0][j], 2);
+    return len > 0 ? Math.sqrt(chord) / len : 1;
+  }
   // The MSE-optimal single guess from pure noise: the mixture mean (what one pass from x_T returns, up to a vanishing term).
   function mixtureMean(comps) {
     var D = comps[0].mu.length, m = new Array(D).fill(0), z = comps.map(function (c) { return Math.exp(c.lp); }), s = z.reduce(function (a, b) { return a + b; }, 0);
@@ -134,6 +166,7 @@
   }
 
   var FR = { T: T, rng: rng, schedule: schedule, abAt: abAt, timesteps: timesteps, qSample: qSample, identityBasis: identityBasis, dctBasis: dctBasis,
-    denoise: denoise, epsFrom: epsFrom, ddimSigma: ddimSigma, ddimStep: ddimStep, sample: sample, mixtureMean: mixtureMean };
+    denoise: denoise, posterior: posterior, epsFrom: epsFrom, ddimSigma: ddimSigma, ddimStep: ddimStep, sample: sample,
+    flowVelocity: flowVelocity, flowSample: flowSample, straightness: straightness, mixtureMean: mixtureMean };
   if (typeof module !== "undefined" && module.exports) module.exports = FR; else root.FR = FR;
 })(typeof window !== "undefined" ? window : this);

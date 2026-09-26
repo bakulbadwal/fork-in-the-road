@@ -48,6 +48,20 @@ console.log("linear schedule:");
 console.log("demos: " + S.demos2d(100, 7, 0).filter(function (p) { return p.side < 0; }).length + " left-drive positions of 600");
 console.log("budget: a card of 8 pins at 10 pins/s lasts 0.8 s; at 10 ms/pass, passes that fit = " + Math.floor(800 / 10) + "; 10 passes = 0.1 s (" + Math.round(100 * 0.1 / 0.9) + "% of the cycle waiting); 1,000 passes = 10 s");
 
+console.log("\n== F. flow matching (same fog, same map, Euler in K steps) ==");
+[1, 2, 3, 4, 5, 10, 20, 50].forEach(function (K) {
+  var fl = S.run2d({ K: K, flow: true, fx: 0 }), dd = S.run2d({ K: K, eta: 0, sch: cos, fx: 0 });
+  console.log(" K=" + K, "flow cart " + pct(fl.tally.cart / 600) + " left " + pct(fl.tally.left / 600) + " straightness " + f(fl.straightness, 3), "| DDIM cart " + pct(dd.tally.cart / 600) + " straightness " + f(dd.straightness, 3));
+});
+// null cases: at t = 0 the velocity points at the mixture mean; the last Euler step lands on E[x1 | x_t]
+var v0 = FR.flowVelocity([1.2, -0.7], 0, comps, S.BASIS2);
+console.log("v(x, t=0) + x = mean?", v0.v.map(function (v, i) { return f(v + [1.2, -0.7][i], 4); }), "· weights at t=0 uniform:", f(Math.max.apply(null, v0.w) - Math.min.apply(null, v0.w), 6));
+var one = FR.flowSample({ K: 1, comps: comps, basis: S.BASIS2, D: 2, n: 3, seed: 5 });
+console.log("K=1 lands on the mean:", one.map(function (c) { return c.x.map(function (v) { return f(v, 3); }).join(","); }).join(" | "));
+console.log("drive with flow cards:");
+var fbase = { policy: "flow", K: 10, Ta: 8, lookout: true, msPerPass: 10, sch: cos, cartAt: S.still(0), seed: 3 };
+[1, 2, 5, 10].forEach(function (K) { var r = S.fleet(Object.assign({}, fbase, { K: K }), 20); console.log(" flow K=" + K + ": hits " + r.hits + "/20 · flips " + f(r.flips, 2) + " · time " + f(r.time, 1) + " s"); });
+
 console.log("\n== D. the lookout (conditioning) ==");
 [0.4, 0.7, 1.0].forEach(function (fx) {
   var seen = S.run2d({ K: 10, eta: 0, sch: cos, fx: fx, fxSeen: fx }), blind = S.run2d({ K: 10, eta: 0, sch: cos, fx: fx, fxSeen: 0 });

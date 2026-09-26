@@ -40,7 +40,7 @@ nav button .ic{display:inline-block;width:20px;height:20px;vertical-align:-4px;m
 nav button .ic svg,.kmap .k svg{width:100%;height:100%;display:block}
 nav button .chk{color:var(--grass-d);margin-left:4px;font-weight:700}
 nav button:nth-child(1){--c:var(--yellow)}nav button:nth-child(2){--c:#D9E4EC}nav button:nth-child(3){--c:#9BCB7E}nav button:nth-child(4){--c:var(--sky)}
-nav button:nth-child(5){--c:var(--lilac)}nav button:nth-child(6){--c:var(--sand)}nav button:nth-child(7){--c:#F2A88F}nav button:nth-child(8){--c:#B7DD9C}nav button:nth-child(9){--c:#E5C9F2}
+nav button:nth-child(5){--c:var(--lilac)}nav button:nth-child(6){--c:var(--sand)}nav button:nth-child(7){--c:#F2A88F}nav button:nth-child(8){--c:#F9D95B}nav button:nth-child(9){--c:#B7DD9C}nav button:nth-child(10){--c:#E5C9F2}
 nav button:focus-visible{outline:3px solid var(--sky-d);outline-offset:2px}
 
 section{display:none}
@@ -179,6 +179,8 @@ canvas.chart{aspect-ratio:2.2/1;height:auto}
 .ladder tr.now{background:#FFF1C6}
 .ladder tr.no td{color:var(--brick-d)}
 .ladder tr.slow{background:#FBE3DC}
+.tablewrap{overflow-x:auto;margin-top:10px;-webkit-overflow-scrolling:touch}
+.tablewrap .ladder{margin-top:0;min-width:440px}
 
 /* the drive HUD (step 6) */
 .hud{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}

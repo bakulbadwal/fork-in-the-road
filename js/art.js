@@ -333,6 +333,42 @@
     s += label(240, 84, "white pins: planned, then dropped", [438, 92], { anchor: "start", from: [420, 88] });
     return wrap("s6", "The courier is mid-way around the left of the cart, following a card of sixteen pins: the first eight are yellow and the rest white, with a small flag reading look at the eighth. The vendor is still pushing the cart; the lookout in the tower waves a fresh report. A waypoint card in the corner reads: 16 pins ahead, drive the first 8, then look again.", s);
   };
+  scenes.s7 = function () {
+    var s = '<rect x="0" y="300" width="960" height="100" fill="' + COBBLE + '" stroke="' + L + '" stroke-width="2"/>';
+    s += '<rect x="0" y="0" width="960" height="300" fill="' + PAPER + '"/><path d="M0 300 H960" stroke="' + L + '" stroke-width="2.5"/>';
+    // two arrow sheets on the table: t = 0 (every arrow at the cart) and t = 0.7 (arrows bending around it)
+    function sheet(x, y, w, h, tt) {
+      var o = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="3" fill="' + SHEET + '" stroke="' + L + '" stroke-width="2"/>';
+      var cx = x + w / 2, cy = y + h / 2;
+      o += '<rect x="' + (cx - w * 0.1) + '" y="' + (cy - h * 0.12) + '" width="' + (w * 0.2) + '" height="' + (h * 0.24) + '" fill="' + WOOD + '" stroke="' + L + '" stroke-width="1.5"/>';
+      for (var gx = x + 14; gx < x + w - 8; gx += 22) for (var gy = y + 14; gy < y + h - 8; gy += 22) {
+        var dx = cx - gx, dy = cy - gy, d = Math.sqrt(dx * dx + dy * dy) || 1;
+        if (tt > 0) { var side = gx < cx ? -1 : 1, tx = cx + side * w * 0.32 - gx, ty = cy - gy; var dd = Math.sqrt(tx * tx + ty * ty) || 1; dx = dx * (1 - tt) + tx / dd * d * tt; dy = dy * (1 - tt) + ty / dd * d * tt; d = Math.sqrt(dx * dx + dy * dy) || 1; }
+        if (Math.abs(gx - cx) < w * 0.12 && Math.abs(gy - cy) < h * 0.14) continue;
+        var ux = dx / d * 9, uy = dy / d * 9;
+        o += '<path d="M' + gx + " " + gy + " l" + ux.toFixed(1) + " " + uy.toFixed(1) + '" stroke="' + LEFT + '" stroke-width="1.6"/><circle cx="' + (gx + ux).toFixed(1) + '" cy="' + (gy + uy).toFixed(1) + '" r="1.6" fill="' + LEFT + '"/>';
+      }
+      return o;
+    }
+    s += table(500, 250, 500) + person(500, 300, { shirt: GRASS, apron: true, hat: "visor", skin: SKIN2 });
+    s += sheet(280, 120, 150, 120, 0) + sheet(570, 120, 150, 120, 0.7);
+    s += txt(355, 112, "t = 0", { size: 14, anchor: "middle" }) + txt(645, 112, "t = 0.7", { size: 14, anchor: "middle" });
+    // the poster: arrows in use
+    s += '<rect x="770" y="40" width="170" height="150" rx="4" fill="' + NOTE + '" stroke="' + L + '" stroke-width="2"/><circle cx="855" cy="45" r="5" fill="' + BRICK + '" stroke="' + L + '" stroke-width="1.8"/>';
+    s += txt(855, 68, "ARROWS IN USE", { size: 14, sign: true, anchor: "middle" });
+    s += txt(782, 94, "π0 · 10 Euler steps", { size: 13 }) + txt(782, 112, "cards of 50, up to 50 Hz", { size: 13 });
+    s += txt(782, 142, "GR00T N1 · 4 steps", { size: 13 }) + txt(782, 160, "cards of 16 in 64 ms", { size: 13 });
+    s += courier(880, 330, 0.8, { flip: true });
+    s += board(270, 8, 420, "ARROWS, NOT GUESSES", LEFT);
+    s += label(40, 130, "instead of guessing the clean sheet,", null, { size: 15 });
+    s += label(40, 154, "she draws an arrow on every pin:", null, { size: 15 });
+    s += label(40, 178, "which way, and how fast", null, { size: 15 });
+    s += label(40, 224, "at t = 0 every arrow points at the cart:", null, { size: 15, fill: BAD });
+    s += label(40, 248, "the average, again", null, { size: 15, fill: BAD });
+    s += label(300, 340, "later, the arrows disagree: some left, some right, bending around the cart", null, { size: 15 });
+    s += label(300, 364, "the courier follows its arrow for one stride, then looks again (Euler)", null, { size: 15 });
+    return wrap("s7", "The cartographer at her table with two arrow sheets. On the first, marked t equals 0, every small arrow on the map points at the cart in the centre. On the second, marked t equals 0.7, the arrows curve left and right around the cart. A poster on the wall reads arrows in use: pi zero, 10 Euler steps, cards of 50; GR00T N1, 4 steps, cards of 16. The courier waits at the right.", s);
+  };
   scenes.cap = function () {
     var s = '<rect x="-5" y="268" width="970" height="100" fill="' + LILAC + '"/><rect x="-5" y="263" width="970" height="7" fill="' + WOOD + '" stroke="' + L + '" stroke-width="2"/><rect x="-5" y="364" width="970" height="40" fill="' + WOOD + '" stroke="' + L + '" stroke-width="3"/>';
     s += '<rect x="34" y="48" width="892" height="180" rx="6" fill="' + WOOD + '" stroke="' + L + '" stroke-width="2.5"/><rect x="44" y="58" width="872" height="160" fill="' + SAND + '" stroke="' + L + '" stroke-width="1.5"/>';
@@ -383,6 +419,7 @@
     tower: ic('<rect x="9" y="9" width="6" height="12" fill="' + WOOD + '"' + st + '/><rect x="6" y="6" width="12" height="4" fill="' + SAND + '"' + st + '/><path d="M5 6 l7 -4 7 4z" fill="' + BRICK + '"' + st + "/>"),
     carto: ic('<circle cx="12" cy="7" r="3.5" fill="' + SKIN2 + '"' + st + '/><rect x="6" y="11" width="12" height="9" rx="3" fill="' + GRASS + '"' + st + '/><path d="M8 4 h8" ' + st + "/>"),
     pin: ic('<circle cx="12" cy="9" r="5" fill="' + YEL + '"' + st + '/><path d="M12 14 v7" ' + st + "/>"),
+    arrow: ic('<path d="M4 18 L18 6" ' + st + ' stroke="' + LEFT + '" stroke-width="2.4"/><path d="M12 5 h7 v7" ' + st + ' stroke="' + LEFT + '" stroke-width="2.4"/><circle cx="5" cy="19" r="2.2" fill="' + YEL + '"' + st + "/>"),
     joystick: ic('<rect x="3" y="15" width="18" height="6" rx="2" fill="' + STEEL + '"' + st + '/><path d="M12 15 l2 -8" ' + st + '/><circle cx="14.5" cy="5.5" r="2.8" fill="' + BRICK + '"' + st + '/><circle cx="7" cy="18" r="1.3" fill="' + YEL + '"' + st + "/>")
   };
 

@@ -43,16 +43,27 @@ Numeric checks are asserted against `window.FR` (the exact math) and `window.FRS
 | B18 | Case 2 | Ta = 8: 0.05 flips ✓ · 50 passes at Ta = 1: 1.80 ✗ · 1 pass: 20/20 dents ✗ | ✓ |
 | B19 | Case 3 | 10 passes: 1/20 dents, 3.5 s ✓ · Ta = 2 at 1,000 passes: 20/20 ✗ · faster motor at 1,000 passes: 17/20, 23.8 s ✗ | ✓ |
 
+## F. Flow matching (step 7): the same fog, the same map, Euler in K strides
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| F1 | Null cases: at t = 0 the velocity points at the mixture mean and the posterior weights are uniform; one Euler stride of length 1 lands on the mean | v(x, 0) + x = mean to 10⁻⁴ · weight spread 0 · K = 1 → (0.000, 0.000) for three seeds | ✓ |
+| F2 | Share of 600 pins in the cart, flow vs DDIM (η = 0, cosine), same seed 11 | K = 1 100% / 100% · 2 39% (232) / 39% (236) · 3 **8% (48) / 11% (66)** · 4 3% / 5% · 5 1% (8) / 2% (10) · 10 <1% (2) / <1% (1) · 20 <1% (1) / 0% · 50 0% / 0% | ✓ |
+| F3 | Straightness (chord ÷ path length), flow vs DDIM | K = 1 1.00 / 1.00 · 2 0.64 / 0.82 · 3 0.47 / 0.71 · 5 0.53 / 0.80 · **10 0.55 / 0.87** · 50 0.55 / 0.89. The marginal flow field bends at the fork; DDIM's paths are straighter here | ✓ |
+| F4 | The drive with flow-matching cards (Euler, lookout on, cart still, 20 drives) | K = 1: 20 of 20 dent (one stride is the clerk) · K = 2: 1 of 20 · K = 5: 0 dents, 0.05 flips · K = 10: 0 dents, 0.05 flips, 3.6 s | ✓ |
+| F5 | Paper facts quoted on the page, read from the papers' full text on 2026-09-26 | π0: A^τ = τA + (1−τ)ε, target A − ε, τ ~ beta emphasising noisier timesteps, forward Euler with 10 steps (δ = 0.1), H = 50, up to 50 Hz, 300M-parameter expert on a 3.3B total · GR00T N1: A^τ = τA + (1−τ)ε, target ε − A, τ ~ Beta(1.5, 1) scaled, forward Euler, K = 4, H = 16, 63.9 ms on an L40 in bf16, 2.2B parameters | ✓ |
+
 ## C. It teaches
 
 - C1 Every step is interactive, with live visuals; nothing computes until a control is touched.
-- C2 Every step 0–6 has at least two predict-then-reveal questions (16 in all), and every number in an answer key appears in A or B.
+- C2 Every step 0–7 has at least one predict-then-reveal question (19 in all), and every number in an answer key appears in A, B or F.
 - C3 Every step ends with a "say it out loud" line that unlocks after the predictions and three interactions.
 - C4 Every wavy-underlined term has a tooltip with its plain meaning and its square equivalent; ᾱ, x̂₀, Ta, latency and flow matching are wired up.
 - C5 Every step names the course notebook section or the Diffusion Policy section it covers.
 - C6 The honesty note is on the page and in the README, and names the timestep spacing correctly ("trailing").
 - C7 Review board: three cases, each with a fleet re-drive scored on the behaviour *and* a named cause; known-good fixes pass, known-bad fixes fail for the stated reason (B17–B19). A star, once earned, is kept.
-- C8 Field test: eight questions answered by operating the widgets, graded automatically with tolerances (8/8 on the right answers; two wrong answers score 6/8). Every question states the settings it needs.
+- C8 Field test: nine questions answered by operating the widgets, graded automatically with tolerances (9/9 on the right answers; seven or more earns the check). Every question states the settings it needs.
+- C11 The map canvases are drawn in the scenes' language: cobbled paving, storefronts down both sides, a tree and a bench, the depot and the bakery, the cart with its striped awning and sign, the courier with its crate and antenna, and fog banks whose opacity follows √(1−ᾱ) on steps 1–2 and the pass progress on steps 3 and 7.
 - C9 The fog-lift and drive animations are time-based; under `prefers-reduced-motion` or `?instant=1` they jump straight to the end, and the buttons re-enable.
 - C10 Every step but the last ends with a "Next: …" button.
 

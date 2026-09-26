@@ -235,7 +235,7 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
     </div>
     <h3>The ladder: passes against dents</h3>
     <p class="lede" style="font-size:15px">600 pins from 600 different fogs, for the schedule and sampler above. Each pin is one sampled position, where a route passes the cart; the wispy lines are the sampler's path through the fog, not the courier driving. Where variety comes from: the starting fog. Different fog, different side.</p>
-    <table class="ladder" id="s3lad"></table>
+    <div class="tablewrap"><table class="ladder" id="s3lad"></table></div>
     <div class="callout co-i"><b>Two samplers, one spacing.</b> <span class="g" data-g="ddim">DDIM</span> with <span class="g" data-g="eta">η = 0</span> is deterministic: the same fog always gives the same pin. η = 1 blows a little fresh fog back in between passes, which is what DDPM's own step does. Both reach the same ladder here; what buys the speed is skipping timesteps, not η, and Diffusion Policy uses DDIM to plan in 10 passes. This lab visits t = 999, 899, … 99 (diffusers' "trailing" spacing). diffusers' <code>DDIMScheduler</code> defaults to "leading", 900, 800, … 0, which never starts a chain at pure fog, so under it one pass wouldn't be the clerk.</div>
     <div class="predict" data-p="s3a">
       <div class="tag">Guess first!</div>
@@ -285,7 +285,7 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
         </div>
         <div class="mathbox"><div class="eq">passes ≤ card length ÷ time per pass</div><div class="eqn" id="s4m"></div></div>
       </div>
-      <div><table class="ladder" id="s4lad"></table>
+      <div><div class="tablewrap" style="margin-top:0"><table class="ladder" id="s4lad"></table></div>
       <div class="chartcap">Dents from the step 3 sampler (η = 0, 600 pins). Waiting share = drawing ÷ (drawing + driving). Rows in red take longer to draw than to drive; the last row walks the course's whole 1,000-step schedule.</div></div>
     </div>
     <div class="callout co-w"><b>The courier stands still while the card is drawn.</b> That's this lab's model of latency, and it's a simplification: real controllers can keep executing the last card while the next one is computed. But a card drawn from a 10-second-old observation is 10 seconds stale either way, which is what the review board's third case is about.</div>
@@ -367,7 +367,7 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
         <label class="tg"><input type="checkbox" id="s6push"><span class="sw"></span>the vendor pushes the cart +0.7 at 0.5 s</label>
         <div class="sl"><div class="sl-h"><span>where the cart starts</span><b id="s6fxv">0.0</b></div><input type="range" id="s6fx" min="-1" max="1" step="0.1" value="0" aria-label="Cart start position"></div>
         <div class="btnrow"><button class="act" id="s6go">Drive</button><button class="ghost" id="s6fleet">Drive 20 in a row</button></div>
-        <div class="lbl">Sampler: DDIM, η = 0 · 10 ms per pass · 10 pins per second</div>
+        <div class="lbl">Sampler: DDIM at η = 0, or forward Euler for arrows · 10 ms per pass · 10 pins per second</div>
       </div>
       <div><canvas id="s6c" class="sq" aria-label="The courier driving across the square with its waypoint card"></canvas>
         <div class="hud">
@@ -414,6 +414,66 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
   </div>
 </section>
 
+<!-- ============ STEP 7 ============ -->
+<section id="s7" data-title="Arrows" data-n="7">
+  <div class="card">
+    <div class="scene" data-art="s7"></div>
+    <h2>7 · Arrows, not guesses: flow matching</h2>
+    <p class="lede">Diffusion asks the cartographer for a guess: what does the clean sheet look like? <span class="g" data-g="flow">Flow matching</span> asks her for an arrow: which way, and how fast, should this pin move to get there? The path is <em>defined</em> as a straight line from a fog point ε to a pin x₁, x<sub>t</sub> = (1 − t)·ε + t·x₁ for t from 0 to 1, and the network is trained to output that line's <span class="g" data-g="velocity">velocity</span>, x₁ − ε. Sampling is following the arrows: start in fog, take one <span class="g" data-g="euler">Euler</span> stride along the current arrow, ask again. The action experts of π0 and GR00T N1 work this way, so this is the version of the fork you'll meet in a 2025 robot. It isn't in the course, which is why it comes last.</p>
+    <p class="covers">Not in the course (notebook 02 mentions a different "velocity" objective in passing) · <b>Lipman et al., Flow Matching for Generative Modeling (2023)</b> · <b>π0 §IV</b> and <b>GR00T N1 §2.2</b>: the action experts</p>
+  </div>
+  <div class="card">
+    <h3>The arrow field</h3>
+    <p class="lede">Every point on the map gets an arrow: the exact best straight-line velocity, averaged over every pin the point could still become. Slide t from pure fog toward the clean map and watch where the arrows point.</p>
+    <div class="pg">
+      <div class="panel">
+        <div class="sl"><div class="sl-h"><span>t: 0 is pure fog, 1 is the clean map</span><b id="s7tv">0.00</b></div><input type="range" id="s7t" min="0" max="0.95" step="0.01" value="0" aria-label="Flow time t"></div>
+        <div class="mathbox"><div class="eq">v(x, t) = (E[x₁ | x<sub>t</sub> = x] − x) ÷ (1 − t)</div><div class="eqn" id="s7m"></div></div>
+        <div class="callout co-r"><b>At t = 0 every arrow points at the same spot:</b> the average of every route, the cart. That's the smudge again, in arrow form. One Euler stride of length 1 lands exactly on it: the clerk, once more. The arrows only start to disagree, some left and some right, once the pins have moved and t has grown.</div>
+      </div>
+      <div><canvas id="s7f" class="sq" aria-label="The flow-matching velocity field over the square, with the 600 pins at time t"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--left)"></span>arrow: the field</span><span><span class="dot" style="background:var(--right)"></span>a pin from a right drive, at x_t</span></div></div>
+    </div>
+    <div class="predict" data-p="s7a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Slide t to 0, pure fog. Where do the arrows point?</div>
+      <div class="opts"><button data-a="0">Along each pin's own route</button><button data-a="1" data-right>All at the cart's centre, the average</button><button data-a="2">Randomly</button></div>
+      <div class="why">All at the average. At t = 0 the pin is pure fog and carries no hint of a side, so the best straight-line velocity is toward the mean of every route: the cart's centre. One Euler stride of length 1 lands there for every pin: 100% of 600, the same as one DDIM pass.</div>
+    </div>
+  </div>
+  <div class="card" data-shot>
+    <h3>The same fog, two samplers</h3>
+    <p class="lede">The same 600 fog points, lifted two ways: DDIM's passes on the left, flow matching's Euler strides on the right, with the same number of each. Thirty of the 600 have their path through the fog traced. <span class="g" data-g="straight">Straightness</span> is chord ÷ path length: 1 would be a straight line.</p>
+    <div class="panel">
+      <div class="row"><span class="lbl" style="margin:0">Passes / strides (K)</span><div class="seg" id="s7k" style="margin:0"></div><button class="act" id="s7go">Lift both</button><span class="status" id="s7st"></span></div>
+    </div>
+    <div class="grid g2">
+      <div><canvas id="s7d" class="sq" aria-label="DDIM: 600 pins lifted from fog, thirty traced"></canvas>
+        <div class="grid g2" style="margin-top:8px"><div class="stat"><div class="v bad" id="s7dc">–</div><div class="l">DDIM · inside the cart</div></div><div class="stat"><div class="v acc" id="s7ds">–</div><div class="l">DDIM · straightness</div></div></div></div>
+      <div><canvas id="s7w" class="sq" aria-label="Flow matching: the same 600 pins, thirty traced"></canvas>
+        <div class="grid g2" style="margin-top:8px"><div class="stat"><div class="v bad" id="s7wc">–</div><div class="l">flow · inside the cart</div></div><div class="stat"><div class="v acc" id="s7ws">–</div><div class="l">flow · straightness</div></div></div></div>
+    </div>
+    <div class="tablewrap"><table class="ladder" id="s7lad"></table></div>
+    <div class="callout co-i"><b>What the robots actually run.</b> π0 (Physical Intelligence, 2024): a 300M-parameter flow-matching action expert on a 3B vision-language model; noisy actions A<sup>τ</sup> = τ·A + (1−τ)·ε, target A − ε, τ drawn from a beta distribution that emphasises the foggier end, forward Euler with 10 steps (δ = 0.1), cards of H = 50 actions at up to 50 Hz. GR00T N1 (NVIDIA, 2025): the same construction with the opposite sign convention for the target (ε − A), forward Euler with K = 4 steps, cards of 16 actions in 63.9 ms on an L40 in bf16, 2.2B parameters in total.</div>
+    <div class="predict" data-p="s7b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Three passes from the same fog. Which sampler leaves fewer pins in the cart?</div>
+      <div class="opts"><button data-a="0">DDIM</button><button data-a="1" data-right>Flow matching, slightly</button><button data-a="2">Exactly the same</button></div>
+      <div class="why">Flow matching, slightly: 8% against DDIM's 11% (48 vs 66 of 600). At five it's 1% vs 2%; by ten both are at 1 or 2 of 600. In this toy they are close cousins: both start at the average and commit in passes. GR00T N1 runs 4 Euler steps and π0 runs 10; the ladder says 4 is already within a few pins of 10 here.</div>
+    </div>
+    <div class="predict" data-p="s7c">
+      <div class="tag">Guess first!</div>
+      <div class="q">Flow matching is sold on straight paths. Measured as chord ÷ path length at 10 passes, whose paths are straighter here?</div>
+      <div class="opts"><button data-a="0">Flow matching's</button><button data-a="1" data-right>DDIM's</button><button data-a="2">Identical</button></div>
+      <div class="why">DDIM's: 0.87 against 0.55. The straight line is a promise about each training pair, one fog point to one pin. The field the network learns is the average of those lines, and at a fork the average of a line going left and a line going right bends: at t = 0 every arrow points at the cart, so a pin that ends up left has to swing away from its first heading, and the trace shows the bend. Rectified flow's answer is to re-pair fog points with the pins they actually reach and train again ("reflow"), which straightens the field; this lab draws the first pass only.</div>
+    </div>
+    <div class="say" data-say="s7">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Flow matching trains an arrow, the straight-line velocity from fog to pin, and samples by following it in a few Euler strides. Same fork, same average at t = 0, same commitment in passes. The straightness is per pair; the fork bends the field.</div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ REVIEW BOARD ============ -->
 <section id="cap" data-title="Review Board" data-n="★">
   <div class="card">
@@ -429,18 +489,18 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
 <section id="ft" data-title="Field Test" data-n="✓">
   <div class="card">
     <h2>✓ Field test</h2>
-    <p class="lede">Eight questions. Answer each by operating the widget in the step named, not from memory. Six or more earns the check.</p>
+    <p class="lede">Nine questions. Answer each by operating the widget in the step named, not from memory. Seven or more earns the check.</p>
     <div id="ftqs"></div>
     <div class="btnrow"><button class="act" id="ftgo">Grade me</button><span id="ftscore" style="font:18px var(--hand);align-self:center"></span></div>
   </div>
   <div class="card">
     <h3>What's exact here, and what's a teaching model</h3>
     <ul class="honest">
-      <li><b>Exact, real math:</b> the forward process x_t = √ᾱ·x₀ + √(1−ᾱ)·ε; the linear and cosine (<code>squaredcos_cap_v2</code>) schedules built the way diffusers builds them; the denoiser, which is the exact Bayes posterior mean E[x₀ | x_t] for the toy demonstration distribution (what a perfectly trained noise-prediction network converges to, with no training error); the ε ↔ x̂₀ conversion; DDIM sampling with η (Song et al., 2021, eq. 12) on diffusers' "trailing" timestep spacing (999, 899, …; its <code>DDIMScheduler</code> defaults to "leading"); the mixture mean as the squared-error-optimal single guess; and every number quoted from the Diffusion Policy paper.</li>
+      <li><b>Exact, real math:</b> the forward process x_t = √ᾱ·x₀ + √(1−ᾱ)·ε; the linear and cosine (<code>squaredcos_cap_v2</code>) schedules built the way diffusers builds them; the denoiser, which is the exact Bayes posterior mean E[x₀ | x_t] for the toy demonstration distribution (what a perfectly trained noise-prediction network converges to, with no training error); the ε ↔ x̂₀ conversion; DDIM sampling with η (Song et al., 2021, eq. 12) on diffusers' "trailing" timestep spacing (999, 899, …; its <code>DDIMScheduler</code> defaults to "leading"); the mixture mean as the squared-error-optimal single guess; flow matching's exact marginal velocity field for the same toy data, followed with forward Euler; the straightness measure; and every number quoted from the Diffusion Policy, π0 and GR00T N1 papers.</li>
       <li><b>Teaching models, labelled on the page:</b> the square, the two demonstrated routes and how the demonstrators' choice of side leans with the courier's position are hand-designed; the courier teleports between checkpoints ten times a second; it stands still while a card is drawn; the vendor's push and pacing are one-number toys. No network is trained here, and nothing here predicts how a real Diffusion Policy run behaves.</li>
       <li><b>The directions are real; the courier isn't a real robot.</b> Real action chunks are joint positions or end-effector poses at 10–50 Hz, conditioned on camera frames, from a network trained on hundreds of demonstrations. The fork, the smudge, the passes, the budget and the re-planning are the same ideas at that scale.</li>
     </ul>
-    <p class="muted" style="font-size:15px;margin-top:10px">Sources: the <a href="https://huggingface.co/learn/diffusion-course/unit1/1" target="_blank" rel="noopener">Hugging Face Diffusion Models Course, Unit 1</a> (both notebooks) · Ho, Jain &amp; Abbeel, <em>Denoising Diffusion Probabilistic Models</em> (2020) · Song, Meng &amp; Ermon, <em>Denoising Diffusion Implicit Models</em> (2021) · Nichol &amp; Dhariwal, <em>Improved DDPM</em> (2021) for the cosine schedule · Chi et al., <a href="https://arxiv.org/abs/2303.04137" target="_blank" rel="noopener"><em>Diffusion Policy: Visuomotor Policy Learning via Action Diffusion</em></a> (2023) for T<sub>p</sub>/T<sub>a</sub>/T<sub>o</sub>, DDIM at 10 steps, 0.1 s on an RTX 3080, FiLM, the square cosine schedule and the 46.9% figure. Further reading: <a href="https://huggingface.co/blog/annotated-diffusion" target="_blank" rel="noopener">The Annotated Diffusion Model</a>, and <a href="https://huggingface.co/lerobot/diffusion_pusht" target="_blank" rel="noopener">lerobot/diffusion_pusht</a> for a real Diffusion Policy you can run.</p>
+    <p class="muted" style="font-size:15px;margin-top:10px">Sources: the <a href="https://huggingface.co/learn/diffusion-course/unit1/1" target="_blank" rel="noopener">Hugging Face Diffusion Models Course, Unit 1</a> (both notebooks) · Ho, Jain &amp; Abbeel, <em>Denoising Diffusion Probabilistic Models</em> (2020) · Song, Meng &amp; Ermon, <em>Denoising Diffusion Implicit Models</em> (2021) · Nichol &amp; Dhariwal, <em>Improved DDPM</em> (2021) for the cosine schedule · Chi et al., <a href="https://arxiv.org/abs/2303.04137" target="_blank" rel="noopener"><em>Diffusion Policy: Visuomotor Policy Learning via Action Diffusion</em></a> (2023) for T<sub>p</sub>/T<sub>a</sub>/T<sub>o</sub>, DDIM at 10 steps, 0.1 s on an RTX 3080, FiLM, the square cosine schedule and the 46.9% figure · Lipman et al., <em>Flow Matching for Generative Modeling</em> (2023) · Liu, Gong &amp; Liu, <em>Flow Straight and Fast</em> (2022) for rectified flow and reflow · Black et al., <a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener"><em>π0: A Vision-Language-Action Flow Model</em></a> (2024) and NVIDIA, <a href="https://arxiv.org/abs/2503.14734" target="_blank" rel="noopener"><em>GR00T N1</em></a> (2025) for the flow-matching action experts, their step counts, chunk lengths and latency. Further reading: <a href="https://huggingface.co/blog/annotated-diffusion" target="_blank" rel="noopener">The Annotated Diffusion Model</a>, and <a href="https://huggingface.co/lerobot/diffusion_pusht" target="_blank" rel="noopener">lerobot/diffusion_pusht</a> for a real Diffusion Policy you can run.</p>
     <div class="btnrow"><button class="ghost" id="reset">Reset all progress</button></div>
   </div>
 </section>
