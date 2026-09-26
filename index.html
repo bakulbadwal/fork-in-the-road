@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fork in the Road</title>
+<meta name="description" content="A hands-on lab for why robots use diffusion to choose actions: the forward process, the exact denoiser, sampling in passes, the inference budget, conditioning, and receding-horizon control, with the real math running in your browser.">
+<meta property="og:title" content="Fork in the Road: why robots use diffusion to choose actions">
+<meta property="og:description" content="Fog a route map, lift the fog in passes, watch a regression policy drive into the cart and a diffusion policy go around it. Real DDPM/DDIM math, a toy town square.">
+<meta property="og:image" content="https://bakulbadwal.github.io/fork-in-the-road/docs/hero.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='6' y='6' width='52' height='52' rx='8' fill='%23EAD9B6' stroke='%234A2E1E' stroke-width='4'/%3E%3Cpath d='M32 56 V40 M32 40 L16 22 M32 40 L48 22' fill='none' stroke='%23246A9C' stroke-width='6' stroke-linecap='round'/%3E%3Crect x='24' y='12' width='16' height='14' fill='%23B8793F' stroke='%234A2E1E' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Grandstander:wght@700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+<script>/* Step links use "#/s3" so the hash never matches an element id and the browser never fragment-jumps. Rewrite the legacy form before the body parses. */(function(){var h=location.hash;if(/^#(s[0-6]|cap|ft)$/.test(h))history.replaceState(null,"","#/"+h.slice(1));})();</script>
+</head>
+<body>
+<!--
+THESIS: A robot that learns from demonstrations meets a fork: two good ways to do the same thing. Averaging them (regression) drives into the obstacle; diffusion samples one. Drawn as a Busytown cutaway of a town square where every worker and object wears its diffusion label. Sibling of Inference Kitchen and Policy Pond.
+OWN-WORLD: flat gouache on paper; warm-brown outlines; cobble, sand, brick and sky as whole fields; Grandstander signboards, Patrick Hand labels, Andika body; painted-sign buttons, price-tag readouts, sticky-note predictions, chalkboard takeaways.
+HONESTY: the schedules, the forward process, the denoiser (the exact Bayes posterior for the toy data) and DDIM sampling are the real math. The square, the demonstrations, the courier's driving and the think-time model are toys, labelled as such.
+-->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs><filter id="gouache" x="-2%" y="-2%" width="104%" height="104%"><feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="2" seed="3" result="w"/><feDisplacementMap in="SourceGraphic" in2="w" scale="1.3" xChannelSelector="R" yChannelSelector="G"/></filter></defs></svg>
+<div class="wrap">
+<header>
+  <div class="mast"><b><span class="mi" aria-hidden="true"></span>Fork in the Road</b><span>a hands-on lab</span></div>
+  <div><h1>Why robots use diffusion to choose actions</h1>
+  <p class="sub">A delivery robot learns from a hundred human drives around a pretzel cart. Half went left, half went right. A model that averages them drives straight into the cart. This lab fogs the route map, lifts the fog in passes, and drives the robot with the result: the real DDPM and DDIM math from Unit 1 of the Hugging Face Diffusion Models Course, pointed at the reason robotics cares. About 75 minutes of play.</p></div>
+</header>
+
+<nav id="nav" aria-label="Steps"></nav>
+
+<!-- ============ STEP 0 ============ -->
+<section id="s0" data-title="The Square" data-n="0">
+  <div class="card">
+    <div class="scene" data-art="s0"></div>
+    <h2>0 · The square: a hundred drives, one fork</h2>
+    <p class="lede">A courier robot has to get from the depot to the bakery. A pretzel cart sits in the road. The dispatcher drove the courier by joystick a hundred times and logged every drive: fifty went left around the cart, fifty went right, none through it. Those logs are the <span class="g" data-g="demo">demonstrations</span>, and the question of this lab is what to <em>learn</em> from them. Every term with a wavy red underline is tappable.</p>
+    <div class="kmap">
+      <div><span class="k" data-i="courier" aria-hidden="true"></span><b>The courier</b> = the robot<br><span class="t">its driving rule is the policy</span></div>
+      <div><span class="k" data-i="joystick" aria-hidden="true"></span><b>The dispatcher</b> = the human demonstrator<br><span class="t">teleoperation, one drive at a time</span></div>
+      <div><span class="k" data-i="sheet" aria-hidden="true"></span><b>Route sheets</b> = the demonstrations<br><span class="t">the training data of imitation learning</span></div>
+      <div><span class="k" data-i="cart" aria-hidden="true"></span><b>The pretzel cart</b> = the obstacle<br><span class="t">the reason the demos fork</span></div>
+      <div><span class="k" data-i="clerk" aria-hidden="true"></span><b>The clerk's average</b> = a regression policy<br><span class="t">trained with <span class="g" data-g="mse">squared error</span> (step 0)</span></div>
+      <div><span class="k" data-i="fog" aria-hidden="true"></span><b>Fog</b> = <span class="g" data-g="noise">noise</span><br><span class="t">rolled over the map on purpose (step 1)</span></div>
+      <div><span class="k" data-i="carto" aria-hidden="true"></span><b>The cartographer</b> = the <span class="g" data-g="denoiser">denoiser</span><br><span class="t">guesses the clean map from a foggy one (step 2)</span></div>
+      <div><span class="k" data-i="tower" aria-hidden="true"></span><b>The lookout's report</b> = the <span class="g" data-g="obs">observation</span><br><span class="t">what the camera sees now (step 5)</span></div>
+      <div><span class="k" data-i="card" aria-hidden="true"></span><b>The waypoint card</b> = an <span class="g" data-g="chunk">action chunk</span><br><span class="t">16 pins ahead, drive 8, look again (step 6)</span></div>
+    </div>
+    <p class="covers">Covers <b>HF Diffusion Course, Unit 1 overview</b>: what a <span class="g" data-g="generative">generative model</span> is for · <b>Diffusion Policy §4.1</b>: multi-modal action distributions</p>
+  </div>
+
+  <div class="card">
+    <h3>Watch the dispatcher drive</h3>
+    <p class="lede">Each drive is logged as a route sheet. Log a few by hand, then dump the whole book. Every dot on the map is one logged position from one drive, coloured by which way that drive went.</p>
+    <div class="pg">
+      <div class="panel">
+        <div class="btnrow"><button class="act" id="s0demo">Log one drive</button><button class="ghost" id="s0all">Log all 100</button><button class="ghost" id="s0clear">Clear ↻</button></div>
+        <div class="grid g3" style="margin-top:8px">
+          <div class="stat"><div class="v" id="s0n">0</div><div class="l">drives logged</div></div>
+          <div class="stat"><div class="v left" id="s0l">0</div><div class="l">went left</div></div>
+          <div class="stat"><div class="v right" id="s0r">0</div><div class="l">went right</div></div>
+        </div>
+        <div class="logtab" id="s0log"></div>
+      </div>
+      <div><canvas id="s0c" class="sq" aria-label="The square: logged drive positions around the cart"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--left)"></span>went left</span><span><span class="dot" style="background:var(--right)"></span>went right</span><span><span class="dot" style="background:var(--cartred)"></span>inside the cart</span></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>The clerk's rule: average the sheets</h3>
+    <p class="lede">The simplest way to learn from the logs is <span class="g" data-g="bc">behaviour cloning</span>: fit a model that maps "where I am" to "where I go next", scored by <span class="g" data-g="mse">mean squared error</span>. Squared error has a fixed answer to an ambiguous question: the average of the plausible answers. Ask the clerk what the route is, and he averages every sheet in the book.</p>
+    <div class="pg">
+      <div class="panel">
+        <div class="btnrow"><button class="act" id="s0avg">Drive the average route</button></div>
+        <div class="grid g2" style="margin-top:8px">
+          <div class="stat"><div class="v" id="s0ax">–</div><div class="l">average route, x at the cart's level</div></div>
+          <div class="stat"><div class="v bad" id="s0res">–</div><div class="l">result</div></div>
+        </div>
+        <div class="mathbox"><div class="eq">average = (50 × left + 50 × right) ÷ 100</div><div class="eqn">left ≈ <b>−1.3</b> · right ≈ <b>+1.3</b> · cart spans <b>−0.55 to +0.55</b><br>average ≈ <b>0.0</b>: straight through</div></div>
+      </div>
+      <div><canvas id="s0c2" class="sq" aria-label="The clerk's average route, driven"></canvas></div>
+    </div>
+    <div class="callout co-w">This is not a weak model. It's the <b>right answer to the wrong question</b>: squared error asks for the single guess that is least wrong on average, and at a fork that guess is the middle. The Diffusion Policy paper calls the demonstrations' distribution <span class="g" data-g="multimodal">multi-modal</span> and names this averaging as the failure it was built to avoid.</div>
+    <div class="predict" data-p="s0a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Average 50 left routes and 50 right routes. At the cart's level, where does the average route go?</div>
+      <div class="opts"><button data-a="0">Left, like most drives</button><button data-a="1" data-right>Straight through the cart</button><button data-a="2">It alternates</button></div>
+      <div class="why">Straight through. The average of −1.3 and +1.3 is 0.0, and the cart is parked at 0. Press the button and watch the dent.</div>
+    </div>
+    <div class="predict" data-p="s0b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Give the clerk ten times more drives: a thousand sheets, still half left and half right. Does he stop hitting the cart?</div>
+      <div class="opts"><button data-a="0">Yes, more data fixes it</button><button data-a="1" data-right>No, the average is the same</button><button data-a="2">Only if the drives get faster</button></div>
+      <div class="why">No. More sheets make the average <em>more precise</em>, not different: it's still 0.0. The problem is the rule, not the data. That's why the fix in this lab is a different kind of model, not a bigger dataset.</div>
+    </div>
+    <div class="say" data-say="s0">
+      <div class="tag">Say it out loud</div>
+      <div class="line">The demonstrations fork. A model trained with squared error answers a fork with the average, and the average of left and right is straight through the cart.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 1 ============ -->
+<section id="s1" data-title="Fog Rolls In" data-n="1">
+  <div class="card">
+    <div class="scene" data-art="s1"></div>
+    <h2>1 · Fog rolls in: the forward process</h2>
+    <p class="lede">Diffusion's trick is to make a hard problem (draw a route) out of a thousand easy ones (make this slightly foggy map slightly clearer). To do that you first need fog you can control. The <span class="g" data-g="forward">forward process</span> mixes each logged position with Gaussian <span class="g" data-g="noise">noise</span> by an amount set by the <span class="g" data-g="t">timestep t</span>, from 0 (clean) to 999 (pure fog). No learning happens here: it's arithmetic.</p>
+    <p class="covers">Covers <b>notebook 02, "The corruption process"</b> and <b>notebook 01, step 3</b>: <code>DDPMScheduler</code>, <code>add_noise</code>, the linear and cosine schedules</p>
+  </div>
+  <div class="card">
+    <h3>Roll the fog</h3>
+    <div class="pg">
+      <div class="panel">
+        <div class="sl"><div class="sl-h"><span>t: how long the fog has rolled</span><b id="s1tv">0</b></div><input type="range" id="s1t" min="0" max="999" step="1" value="0" aria-label="Timestep t"></div>
+        <div class="lbl">Fog <span class="g" data-g="schedule">schedule</span></div>
+        <div class="seg" id="s1sch"></div>
+        <div class="grid g2" style="margin-top:8px">
+          <div class="stat"><div class="v acc" id="s1a">1.00</div><div class="l">√ᾱ · the map's volume</div></div>
+          <div class="stat"><div class="v" id="s1b">0.00</div><div class="l">√(1−ᾱ) · the fog's volume</div></div>
+          <div class="stat"><div class="v warn" id="s1swap">0%</div><div class="l">dots now on the wrong side of the road</div></div>
+          <div class="stat"><div class="v" id="s1half">–</div><div class="l">t where the map is half fog</div></div>
+        </div>
+        <div class="mathbox"><div class="eq">x<sub>t</sub> = √ᾱ<sub>t</sub> · x<sub>0</sub> + √(1 − ᾱ<sub>t</sub>) · ε</div><div class="eqn" id="s1m"></div></div>
+      </div>
+      <div><canvas id="s1c" class="sq" aria-label="Logged positions under fog"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--left)"></span>logged on a left drive</span><span><span class="dot" style="background:var(--right)"></span>logged on a right drive</span></div></div>
+    </div>
+    <h3>The schedule: how fast the fog thickens</h3>
+    <div class="pg">
+      <div class="panel">
+        <p style="font-size:15.5px">DDPM adds a little noise β<sub>t</sub> at each of 1,000 steps. You never apply it a thousand times: ᾱ<sub>t</sub> = ∏(1 − β<sub>i</sub>) gives a shortcut straight to any t. Two knobs: <b>√ᾱ</b> is the map's volume and <b>√(1−ᾱ)</b> the fog's; their squares always sum to 1, so the mix never gets louder or quieter.</p>
+        <p style="font-size:15.5px;margin-top:8px"><b>Linear</b> is diffusers' default (β from 0.0001 to 0.02): half fog by t ≈ 260. <b><span class="g" data-g="cosine">Cosine</span></b> (<code>squaredcos_cap_v2</code>) fogs slowly at first: half fog by t ≈ 500. Notebook 01 trains with cosine, and so does Diffusion Policy.</p>
+      </div>
+      <div><canvas id="s1chart" class="chart" aria-label="Schedule chart: map volume and fog volume against t"></canvas>
+      <div class="chartcap"><span class="sw" style="background:var(--left)"></span>√ᾱ, the map · <span class="sw" style="background:var(--right)"></span>√(1−ᾱ), the fog · the marker is your t</div></div>
+    </div>
+    <div class="predict" data-p="s1a">
+      <div class="tag">Guess first!</div>
+      <div class="q">With the cosine schedule, at roughly which t is the map half map, half fog (√ᾱ ≈ √(1−ᾱ))?</div>
+      <div class="opts"><button data-a="0">About 250</button><button data-a="1" data-right>About 500</button><button data-a="2">About 750</button></div>
+      <div class="why">About 500 (496 exactly). Cosine keeps the map loud for the first few hundred steps. Read it off the chart where the two curves cross.</div>
+    </div>
+    <div class="predict" data-p="s1b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Switch to the linear schedule. Does the fog reach half strength earlier or later than with cosine?</div>
+      <div class="opts"><button data-a="0" data-right>Earlier, around t ≈ 260</button><button data-a="1">Later, around t ≈ 700</button><button data-a="2">The same t</button></div>
+      <div class="why">Earlier: t = 259. Notebook 02 notices this too ("this one gets noisy relatively quickly"). It matters in step 3: with few passes, where the sampler stops depends on the schedule.</div>
+    </div>
+    <div class="say" data-say="s1">
+      <div class="tag">Say it out loud</div>
+      <div class="line">x_t equals √ᾱ times the map plus √(1−ᾱ) times fog: a crossfader set by the schedule. Cosine fogs slowly early; linear is half fog by about t = 260.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 2 ============ -->
+<section id="s2" data-title="The Cartographer" data-n="2">
+  <div class="card">
+    <div class="scene" data-art="s2"></div>
+    <h2>2 · The cartographer: one guess from the fog</h2>
+    <p class="lede">Now the learned half. The <span class="g" data-g="denoiser">denoiser</span> is a network (a <span class="g" data-g="unet">UNet</span> in the course, a 1-D one in Diffusion Policy) trained on millions of (foggy map, true map) pairs at every fog level, scored by squared error. Here she is the cartographer, and here you can watch her best single guess: for every foggy dot, the clean position she would draw. Under the hood this lab uses the <em>exact</em> best guess for the toy data, which is what a perfectly trained network converges to.</p>
+    <p class="covers">Covers <b>notebook 02, "The model" and "Training the network"</b>: the blur at high noise · <b>notebook 02, "Training objective"</b>: predicting ε vs predicting x₀</p>
+  </div>
+  <div class="card">
+    <h3>Her guess at every fog level</h3>
+    <div class="pg">
+      <div class="panel">
+        <div class="sl"><div class="sl-h"><span>t: how foggy the map she's given is</span><b id="s2tv">300</b></div><input type="range" id="s2t" min="0" max="999" step="1" value="300" aria-label="Timestep t"></div>
+        <div class="seg" id="s2sch"></div>
+        <label class="tg"><input type="checkbox" id="s2arr" checked><span class="sw"></span>draw each guess's pointer from its foggy dot</label>
+        <div class="grid g3" style="margin-top:8px">
+          <div class="stat"><div class="v left" id="s2l">–</div><div class="l">guesses left</div></div>
+          <div class="stat"><div class="v right" id="s2r">–</div><div class="l">guesses right</div></div>
+          <div class="stat"><div class="v bad" id="s2cart">–</div><div class="l">guesses inside the cart</div></div>
+        </div>
+        <div class="mathbox"><div class="eq">one dot, the weight she puts on each side</div><div class="eqn" id="s2m"></div></div>
+      </div>
+      <div><canvas id="s2c" class="sq" aria-label="Foggy dots and the cartographer's clean guess for each"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--fog-d)"></span>the foggy dot she's given</span><span><span class="dot" style="background:var(--left)"></span>guess, left</span><span><span class="dot" style="background:var(--right)"></span>guess, right</span><span><span class="dot" style="background:var(--cartred)"></span>guess, inside the cart</span></div></div>
+    </div>
+    <div class="callout co-r"><b>Slide t to 999.</b> Every guess lands in the middle of the cart. From pure fog, the guess that is least wrong on average is the average of every route: notebook 02's "blurry mess close to the mean of the dataset". It is the clerk's average from step 0, produced by a different model for the same reason.</div>
+    <h3>Predict the noise or predict the map?</h3>
+    <p class="lede">The toy in notebook 02 trains the network to output the clean map. DDPM (and notebook 01) trains it to output the <span class="g" data-g="eps">noise</span> that was added instead. They're the same prediction in different clothes: knowing the foggy map, t and the noise, you can solve the forward formula for the clean map. The chalk box does that for one dot.</p>
+    <div class="mathbox"><div class="eq">x̂<sub>0</sub> = (x<sub>t</sub> − √(1 − ᾱ<sub>t</sub>) · ε̂) ÷ √ᾱ<sub>t</sub></div><div class="eqn" id="s2m2"></div></div>
+    <div class="callout co-i">Why prefer the noise target? It has the same scale (unit Gaussian) at every t, so the job is equally well posed whether the input is nearly clean or nearly pure fog. A clean-map target is trivial at low t and the smudge at high t. The Diffusion Policy paper describes its network as learning "the gradient of the action-distribution score": the same quantity, pointing from fog toward data.</div>
+    <div class="predict" data-p="s2a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Slide t to 999, pure fog. Where do the cartographer's guesses land?</div>
+      <div class="opts"><button data-a="0">Half left, half right</button><button data-a="1" data-right>All in the middle of the cart</button><button data-a="2">Scattered everywhere</button></div>
+      <div class="why">All in the cart, 100%. Pure fog carries no hint of a side, so the squared-error-best guess is the average of everything: the middle. Notice the weights in the chalk box: 0.50 left, 0.50 right.</div>
+    </div>
+    <div class="predict" data-p="s2b">
+      <div class="tag">Guess first!</div>
+      <div class="q">DDPM trains the network to predict the noise ε rather than the clean map. Is that a different prediction?</div>
+      <div class="opts"><button data-a="0">Yes, it learns something else</button><button data-a="1" data-right>No, same information, different target</button><button data-a="2">Only at t = 999</button></div>
+      <div class="why">Same information. x̂₀ = (x_t − √(1−ᾱ)·ε̂) ÷ √ᾱ, and the chalk box recovers the guess from the noise prediction exactly. The noise target is preferred because its scale doesn't change with t.</div>
+    </div>
+    <div class="say" data-say="s2">
+      <div class="tag">Say it out loud</div>
+      <div class="line">From pure fog, the squared-error-best guess is the average of every route: the smudge. That's not a weak network. It's what squared error rewards, and the next step is how diffusion gets around it.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 3 ============ -->
+<section id="s3" data-title="Fog Lifts in Passes" data-n="3">
+  <div class="card">
+    <div class="scene" data-art="s3"></div>
+    <h2>3 · Fog lifts in passes: the sampler</h2>
+    <p class="lede">If one guess from pure fog is a smudge, how does diffusion ever draw a real route? By not trusting the first guess. Start from pure fog, ask the cartographer for her guess, then lift only <em>part</em> of the fog toward it. Now the map leans, faintly, one way. Her next guess conditions on that lean and is less averaged. Repeat: each pass commits a little more, until the map has picked a side. This is the <span class="g" data-g="reverse">reverse process</span>, and the rule for how much to lift per pass is the <span class="g" data-g="sampler">sampler</span>.</p>
+    <p class="covers">Covers <b>notebook 02, "Sampling"</b>: the 5-step and 40-step loops · <b>notebook 01, step 6</b>: <code>scheduler.step()</code> · <b>notebook 02, "Sampling" (DDPM comparison)</b>: step size and churn</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>Lift the fog</h3>
+    <div class="pg">
+      <div class="panel">
+        <div class="lbl">Passes (K)</div><div class="seg" id="s3k"></div>
+        <div class="lbl">Sampler</div><div class="seg" id="s3eta"></div>
+        <div class="lbl">Fog schedule</div><div class="seg" id="s3sch"></div>
+        <label class="tg"><input type="checkbox" id="s3trail" checked><span class="sw"></span>trace 30 of the 600 routes</label>
+        <label class="tg"><input type="checkbox" id="s3guess"><span class="sw"></span>show her clean guess at each pass</label>
+        <div class="btnrow"><button class="act" id="s3go">Lift the fog</button><span class="status" id="s3st"></span></div>
+        <div class="grid g3">
+          <div class="stat"><div class="v left" id="s3l">–</div><div class="l">went left</div></div>
+          <div class="stat"><div class="v right" id="s3r">–</div><div class="l">went right</div></div>
+          <div class="stat"><div class="v bad" id="s3cart">–</div><div class="l">inside the cart</div></div>
+        </div>
+      </div>
+      <div><canvas id="s3c" class="sq" aria-label="600 routes denoised from pure fog"></canvas>
+      <div class="legend"><span><span class="dot" style="background:var(--fog-d)"></span>still foggy</span><span><span class="dot" style="background:var(--left)"></span>went left</span><span><span class="dot" style="background:var(--right)"></span>went right</span><span><span class="dot" style="background:var(--cartred)"></span>inside the cart</span></div></div>
+    </div>
+    <h3>The ladder: passes against dents</h3>
+    <p class="lede" style="font-size:15px">600 routes from 600 different fogs, for the schedule and sampler above. Where variety comes from: the starting fog. Different fog, different side.</p>
+    <table class="ladder" id="s3lad"></table>
+    <div class="callout co-i"><b>Two samplers.</b> <span class="g" data-g="ddim">DDIM</span> with <span class="g" data-g="eta">η = 0</span> is deterministic: the same fog always gives the same route. η = 1 blows a little fresh fog back in between passes, which is what DDPM's own step does. Both reach the same ladder here; the difference shows up in how much variety you get from one starting point. Diffusion Policy uses DDIM at η = 0 so it can plan in 10 passes.</div>
+    <div class="predict" data-p="s3a">
+      <div class="tag">Guess first!</div>
+      <div class="q">One pass from pure fog, cosine schedule. What share of the 600 routes end inside the cart?</div>
+      <div class="opts"><button data-a="0">About half</button><button data-a="1" data-right>All of them</button><button data-a="2">Almost none</button></div>
+      <div class="why">All 600. One pass is one guess from pure fog, and step 2 showed where that lands: the average, the cart. K = 1 is the clerk.</div>
+    </div>
+    <div class="predict" data-p="s3b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Five passes, cosine, η = 0. What share end inside the cart?</div>
+      <div class="opts"><button data-a="0">Still about half</button><button data-a="1">About a fifth</button><button data-a="2" data-right>Almost none</button></div>
+      <div class="why">About 2% (12 of 600). Two passes: 39%. Three: 11%. Ten: 0%. Each pass starts from a map that already leans, so the guesses stop averaging. Run K = 2, then 3, then 5 and watch the middle empty out.</div>
+    </div>
+    <div class="predict" data-p="s3c">
+      <div class="tag">Guess first!</div>
+      <div class="q">Switch to the linear schedule and take 2 passes. Compared with cosine's 39% in the cart, is it better or worse?</div>
+      <div class="opts"><button data-a="0">Better</button><button data-a="1">About the same</button><button data-a="2" data-right>Much worse</button></div>
+      <div class="why">Much worse: 94%. The two-pass sampler stops at t = 999 and t = 499, and under the linear schedule t = 499 is still 96% fog (√(1−ᾱ) = 0.96), so the second guess is nearly as averaged as the first. Under cosine, t = 499 is half map. Few-pass sampling and the schedule are one decision, which is why Diffusion Policy chose cosine.</div>
+    </div>
+    <div class="say" data-say="s3">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Lift the fog in passes. Each guess starts from a map that already leans one way, so the route commits to one side instead of averaging both. Ten passes are plenty here; one is never enough.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 4 ============ -->
+<section id="s4" data-title="The Stopwatch" data-n="4">
+  <div class="card">
+    <div class="scene" data-art="s4"></div>
+    <h2>4 · The stopwatch: how many passes can you afford</h2>
+    <p class="lede">An image generator can take a second to draw a butterfly. A robot can't: the courier is moving, the square is changing, and a new card has to be ready ten times a second. Every pass is one run of the network, so passes cost time. DDPM samples through all 1,000 training steps. <span class="g" data-g="ddim">DDIM</span> decouples training from inference: train at 100 steps, sample in 10. The Diffusion Policy paper reports <b>0.1 s per action chunk on an RTX 3080 with 10 DDIM passes</b>, which is where the 10 ms per pass below comes from.</p>
+    <p class="covers">Covers <b>notebook 02, "Comparison to DDPM · Sampling"</b>: step size and fewer steps · <b>Diffusion Policy §3.4</b>: accelerating inference for real-time control</p>
+  </div>
+  <div class="card">
+    <h3>The budget</h3>
+    <div class="pg">
+      <div class="panel">
+        <div class="sl"><div class="sl-h"><span>time per pass (ms)</span><b id="s4msv">10</b></div><input type="range" id="s4ms" min="1" max="50" step="1" value="10" aria-label="Milliseconds per pass"></div>
+        <div class="lbl">Control loop: a new card every…</div><div class="seg" id="s4hz"></div>
+        <div class="lbl">Fog schedule</div><div class="seg" id="s4sch"></div>
+        <div class="grid g2" style="margin-top:8px">
+          <div class="stat"><div class="v acc" id="s4bud">100 ms</div><div class="l">budget per card</div></div>
+          <div class="stat"><div class="v good" id="s4max">10</div><div class="l">passes that fit</div></div>
+          <div class="stat"><div class="v" id="s4cart">–</div><div class="l">dents at that many passes</div></div>
+          <div class="stat"><div class="v bad" id="s4ddpm">10 s</div><div class="l">DDPM's 1,000 passes take</div></div>
+        </div>
+        <div class="mathbox"><div class="eq">passes ≤ budget ÷ time per pass</div><div class="eqn" id="s4m"></div></div>
+      </div>
+      <div><table class="ladder" id="s4lad"></table>
+      <div class="chartcap">Dents from the step 3 sampler (η = 0, 600 routes). Rows in red don't fit the budget; the last row is DDPM's full schedule.</div></div>
+    </div>
+    <div class="callout co-w"><b>The courier stands still while the card is drawn.</b> That's this lab's model of latency, and it's a simplification: real controllers can keep executing the last card while the next one is computed. But a card drawn from a 10-second-old observation is 10 seconds stale either way, which is what the review board's third case is about.</div>
+    <div class="predict" data-p="s4a">
+      <div class="tag">Guess first!</div>
+      <div class="q">10 ms per pass, a new card every 100 ms. How many passes fit?</div>
+      <div class="opts"><button data-a="0">1</button><button data-a="1" data-right>10</button><button data-a="2">100</button></div>
+      <div class="why">10, and step 3's ladder says 10 passes already put 0% in the cart. That is the whole argument for DDIM in Diffusion Policy: the passes you can afford are enough.</div>
+    </div>
+    <div class="predict" data-p="s4b">
+      <div class="tag">Guess first!</div>
+      <div class="q">DDPM's full 1,000 passes at 10 ms each. How long does the courier wait for one card?</div>
+      <div class="opts"><button data-a="0">1 second</button><button data-a="1" data-right>10 seconds</button><button data-a="2">100 seconds</button></div>
+      <div class="why">10 seconds, for a card that covers 1.6 seconds of driving. The square will have changed before the courier moves.</div>
+    </div>
+    <div class="say" data-say="s4">
+      <div class="tag">Say it out loud</div>
+      <div class="line">A 10 Hz loop gives 100 ms per card. At 10 ms a pass, that's 10 DDIM passes, which already put 0% in the cart. DDPM's 1,000 passes would take 10 seconds: the square has moved on.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 5 ============ -->
+<section id="s5" data-title="The Lookout" data-n="5">
+  <div class="card">
+    <div class="scene" data-art="s5"></div>
+    <h2>5 · The lookout: conditioning on what the robot sees</h2>
+    <p class="lede">So far the cart never moved, so "draw a route" meant the same thing every day. A robot's world isn't like that. Diffusion Policy conditions the denoiser on the <span class="g" data-g="obs">observation</span>: the last two camera frames plus the robot's own joints, encoded by a ResNet and injected into every layer of the network with <span class="g" data-g="film">FiLM</span>. In the square, that's the lookout's report: "cart at +0.7 today." With it on her desk, the cartographer draws routes around where the cart is. Blindfolded, she draws them around where it used to be.</p>
+    <p class="covers">Covers <b>Diffusion Policy §3.1</b>: FiLM conditioning on Oₜ · contrast with <b>Unit 2, notebook 02</b>: class labels concatenated as input channels</p>
+  </div>
+  <div class="card">
+    <h3>Move the cart</h3>
+    <div class="panel">
+      <div class="sl"><div class="sl-h"><span>where the vendor parked the cart today</span><b id="s5fxv">+0.7</b></div><input type="range" id="s5fx" min="-1" max="1" step="0.1" value="0.7" aria-label="Cart position"></div>
+      <div class="btnrow"><button class="act" id="s5go">Draw 600 routes, 10 passes each</button><span class="status" id="s5st"></span></div>
+    </div>
+    <div class="grid g2">
+      <div><h3 style="margin-top:0">With the report</h3><canvas id="s5a" class="sq" aria-label="Routes drawn with the observation"></canvas>
+        <div class="grid g2" style="margin-top:8px"><div class="stat"><div class="v good" id="s5ac">–</div><div class="l">inside the cart</div></div><div class="stat"><div class="v left" id="s5al">–</div><div class="l">went left</div></div></div></div>
+      <div><h3 style="margin-top:0">Blindfolded</h3><canvas id="s5b" class="sq" aria-label="Routes drawn without the observation"></canvas>
+        <div class="grid g2" style="margin-top:8px"><div class="stat"><div class="v bad" id="s5bc">–</div><div class="l">inside the cart</div></div><div class="stat"><div class="v left" id="s5bl">–</div><div class="l">went left</div></div></div></div>
+    </div>
+    <div class="callout co-i"><b>How the report gets in.</b> Unit 2's class-conditioned notebook embeds the label and concatenates it to the input as extra image channels: the condition enters once, at the door. FiLM instead lets the observation produce a scale and a shift for every channel at every layer, so "what I see" steers every stroke of "what I draw". Same purpose; the deeper injection is what makes the policy react to a camera.</div>
+    <div class="predict" data-p="s5a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Park the cart at +1.0 and blindfold the cartographer. Where do her routes go?</div>
+      <div class="opts"><button data-a="0">Around today's cart, she's been trained for this</button><button data-a="1" data-right>Around where the cart used to be, and some hit it</button><button data-a="2">Straight through, like the clerk</button></div>
+      <div class="why">Around the old spot: her left and right routes are ±1.3 from the centre line, and the cart now spans +0.45 to +1.55, so 28% of the routes end inside it, all of them "right" routes. With the report, 0%.</div>
+    </div>
+    <div class="predict" data-p="s5b">
+      <div class="tag">Guess first!</div>
+      <div class="q">In Diffusion Policy, how does the camera observation reach the denoiser?</div>
+      <div class="opts"><button data-a="0">Concatenated to the input as extra channels</button><button data-a="1" data-right>FiLM: a scale and shift on every layer's features</button><button data-a="2">It's added to the noise</button></div>
+      <div class="why">FiLM. The concatenation answer is how Unit 2's class-conditioned toy does it, which works for a label but enters only at the input. FiLM conditions every layer, which the paper uses for both the observation and the denoising step k.</div>
+    </div>
+    <div class="say" data-say="s5">
+      <div class="tag">Say it out loud</div>
+      <div class="line">The observation is the conditioning. The cartographer draws routes around today's cart because the report is on her desk while she draws every pin. Blindfolded, she draws around where it used to be.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ STEP 6 ============ -->
+<section id="s6" data-title="Pin 16, Drive 8" data-n="6">
+  <div class="card">
+    <div class="scene" data-art="s6"></div>
+    <h2>6 · Pin 16, drive 8, look again: the robot drives</h2>
+    <p class="lede">Everything so far, put on the road. The cartographer no longer draws one dot: she draws a <span class="g" data-g="chunk">card of 16 pins</span> (the paper's T<sub>p</sub> = 16), the courier drives the first 8 (T<sub>a</sub> = 8), then the lookout sends a fresh report and she draws a new card. Predict a short horizon, execute the first part, re-plan: <span class="g" data-g="receding">receding-horizon control</span>, the model-predictive-control idea running on a diffusion sampler. Every card here is denoised from fresh fog with the passes and sampler you pick.</p>
+    <p class="covers">Covers <b>Diffusion Policy §3</b>: T<sub>o</sub> = 2, T<sub>p</sub> = 16, T<sub>a</sub> = 8, DDIM at 10 steps · <b>§4.3</b>: the trade-off in T<sub>a</sub> · <b>Physical AI field guide §3.4</b>: MPC</p>
+  </div>
+  <div class="card" data-shot>
+    <h3>Drive</h3>
+    <div class="pg">
+      <div class="panel">
+        <div class="lbl">Who draws the card</div><div class="seg" id="s6pol"></div>
+        <div class="lbl">Passes per card</div><div class="seg" id="s6k"></div>
+        <div class="lbl">Pins driven per card (T<sub>a</sub>)</div><div class="seg" id="s6ta"></div>
+        <label class="tg"><input type="checkbox" id="s6look" checked><span class="sw"></span>the lookout reports (conditioning on)</label>
+        <label class="tg"><input type="checkbox" id="s6push"><span class="sw"></span>the vendor pushes the cart +0.7 at 0.5 s</label>
+        <div class="sl"><div class="sl-h"><span>where the cart starts</span><b id="s6fxv">0.0</b></div><input type="range" id="s6fx" min="-1" max="1" step="0.1" value="0" aria-label="Cart start position"></div>
+        <div class="btnrow"><button class="act" id="s6go">Drive</button><button class="ghost" id="s6fleet">Drive 20 in a row</button></div>
+        <div class="lbl">Sampler: DDIM, η = 0 · 10 ms per pass · 10 pins per second</div>
+      </div>
+      <div><canvas id="s6c" class="sq" aria-label="The courier driving across the square with its waypoint card"></canvas>
+        <div class="hud">
+          <div class="stat"><div class="v acc" id="s6t">0.0 s</div><div class="l">clock</div></div>
+          <div class="stat"><div class="v" id="s6card">–</div><div class="l">card</div></div>
+          <div class="stat"><div class="v warn" id="s6do">ready</div><div class="l">the courier is</div></div>
+          <div class="stat"><div class="v bad" id="s6dent">0</div><div class="l">dents</div></div>
+        </div>
+        <div class="pins" id="s6pins" aria-label="The current card's pins"></div>
+        <div class="status" id="s6st"></div>
+        <div class="legend"><span><span class="dot" style="background:var(--yellow)"></span>pin being driven</span><span><span class="dot" style="background:var(--grass)"></span>driven</span><span><span class="dot" style="background:var(--sheet)"></span>planned, then thrown away</span><span>dashed box: where the courier <em>thinks</em> the cart is</span></div>
+      </div>
+    </div>
+    <h3>Twenty drives, no animation</h3>
+    <div class="grid g4">
+      <div class="stat"><div class="v good" id="s6fa">–</div><div class="l">reached the bakery</div></div>
+      <div class="stat"><div class="v bad" id="s6fh">–</div><div class="l">hit the cart</div></div>
+      <div class="stat"><div class="v" id="s6ff">–</div><div class="l">side flips per drive</div></div>
+      <div class="stat"><div class="v" id="s6ftm">–</div><div class="l">seconds per drive</div></div>
+    </div>
+    <div class="callout co-i"><b>Side flips</b> count how often a fresh card picks the other side of the cart from the last one, before the courier reaches it. Re-plan every pin and the courier dithers; drive 8 per card and it commits. That's the paper's §4.3 trade-off: T<sub>a</sub> "encourages temporal action consistency while remaining responsive". The other end of the dial is worth a run too: drive the <b>whole card</b> (T<sub>a</sub> = 16) with the push and the lookout on, and 10 of 20 drives dent the cart. The report arrives, but nobody re-reads it until the card is used up.</div>
+    <div class="predict" data-p="s6a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Re-plan after every pin (T<sub>a</sub> = 1) instead of every 8. Over 20 drives, what changes?</div>
+      <div class="opts"><button data-a="0">More dents</button><button data-a="1" data-right>More side flips, no more dents</button><button data-a="2">Nothing, more re-planning is always better</button></div>
+      <div class="why">Side flips jump from about 0.05 per drive to about 1.9: each fresh card is a fresh sample, and near the depot the fork is still 50/50, so the courier zigzags. Dents stay at 0. Driving 8 pins per card is what commits it.</div>
+    </div>
+    <div class="predict" data-p="s6b">
+      <div class="tag">Guess first!</div>
+      <div class="q">Blindfold the cartographer (lookout off) and let the vendor push the cart at 0.5 s. Of 20 drives, how many hit the cart?</div>
+      <div class="opts"><button data-a="0">None</button><button data-a="1" data-right>About half</button><button data-a="2">All</button></div>
+      <div class="why">11 of 20. Every drive that chose the right side aims at where the cart used to be, which is now empty road, and drives into where it is. The left-side drives get lucky. With the lookout on: 0 of 20, and the courier re-routes after the push.</div>
+    </div>
+    <div class="predict" data-p="s6c">
+      <div class="tag">Guess first!</div>
+      <div class="q">Switch to the clerk's averager, lookout on, with the push. Does the averager still hit the cart?</div>
+      <div class="opts"><button data-a="0">Yes, every time, like step 0</button><button data-a="1" data-right>No: once the cart is off-centre the demos stop forking evenly</button><button data-a="2">It can't move at all</button></div>
+      <div class="why">No, 0 of 20. In this toy, once the cart is off to one side the demonstrators almost all went the other way, so the average <em>is</em> a real route. The averager fails exactly where the demonstrations fork evenly, which is the situation the paper's Push-T task creates on purpose. Park the cart back at 0.0 with no push and it dents every time.</div>
+    </div>
+    <div class="say" data-say="s6">
+      <div class="tag">Say it out loud</div>
+      <div class="line">Pin 16, drive 8, look again. The card gives smooth, committed motion; the fresh report gives reactivity; ten DDIM passes make it fast enough to do this ten times a second.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ REVIEW BOARD ============ -->
+<section id="cap" data-title="Review Board" data-n="★">
+  <div class="card">
+    <div class="scene" data-art="cap"></div>
+    <h2>★ Dispatch review board</h2>
+    <p class="lede">Three dispatch rules came back with incident reports. For each: run the rule as dispatched, pick a fix, re-drive twenty times, and name the cause. The tempting wrong fixes are on the list, and they fail for the reason the step taught. Each case is scored on the re-drive <em>and</em> the cause.</p>
+    <div id="capcases"></div>
+    <div class="row" style="margin-top:12px"><span class="stars" id="capstars">☆☆☆</span><span class="verdict" id="capverdict"></span></div>
+  </div>
+</section>
+
+<!-- ============ FIELD TEST ============ -->
+<section id="ft" data-title="Field Test" data-n="✓">
+  <div class="card">
+    <h2>✓ Field test</h2>
+    <p class="lede">Eight questions. Answer each by operating the widget in the step named, not from memory. Six or more earns the check.</p>
+    <div id="ftqs"></div>
+    <div class="btnrow"><button class="act" id="ftgo">Grade me</button><span id="ftscore" style="font:18px var(--hand);align-self:center"></span></div>
+  </div>
+  <div class="card">
+    <h3>What's exact here, and what's a teaching model</h3>
+    <ul class="honest">
+      <li><b>Exact, real math:</b> the forward process x_t = √ᾱ·x₀ + √(1−ᾱ)·ε; the linear and cosine (<code>squaredcos_cap_v2</code>) schedules built the way diffusers builds them; the denoiser, which is the exact Bayes posterior mean E[x₀ | x_t] for the toy demonstration distribution (what a perfectly trained noise-prediction network converges to, with no training error); the ε ↔ x̂₀ conversion; DDIM sampling with η (Song et al., 2021, eq. 12) on the "leading" timestep spacing; the mixture mean as the squared-error-optimal single guess; and every number quoted from the Diffusion Policy paper.</li>
+      <li><b>Teaching models, labelled on the page:</b> the square, the two demonstrated routes and how the demonstrators' choice of side leans with the courier's position are hand-designed; the courier teleports between checkpoints ten times a second; it stands still while a card is drawn; the vendor's push and pacing are one-number toys. No network is trained here, and nothing here predicts how a real Diffusion Policy run behaves.</li>
+      <li><b>The directions are real; the courier isn't a real robot.</b> Real action chunks are joint positions or end-effector poses at 10–50 Hz, conditioned on camera frames, from a network trained on hundreds of demonstrations. The fork, the smudge, the passes, the budget and the re-planning are the same ideas at that scale.</li>
+    </ul>
+    <p class="muted" style="font-size:15px;margin-top:10px">Sources: the <a href="https://huggingface.co/learn/diffusion-course/unit1/1" target="_blank" rel="noopener">Hugging Face Diffusion Models Course, Unit 1</a> (both notebooks) · Ho, Jain &amp; Abbeel, <em>Denoising Diffusion Probabilistic Models</em> (2020) · Song, Meng &amp; Ermon, <em>Denoising Diffusion Implicit Models</em> (2021) · Nichol &amp; Dhariwal, <em>Improved DDPM</em> (2021) for the cosine schedule · Chi et al., <a href="https://arxiv.org/abs/2303.04137" target="_blank" rel="noopener"><em>Diffusion Policy: Visuomotor Policy Learning via Action Diffusion</em></a> (2023) for T<sub>p</sub>/T<sub>a</sub>/T<sub>o</sub>, DDIM at 10 steps, 0.1 s on an RTX 3080, FiLM, the square cosine schedule and the 46.9% figure. Further reading: <a href="https://huggingface.co/blog/annotated-diffusion" target="_blank" rel="noopener">The Annotated Diffusion Model</a>, and <a href="https://huggingface.co/lerobot/diffusion_pusht" target="_blank" rel="noopener">lerobot/diffusion_pusht</a> for a real Diffusion Policy you can run.</p>
+    <div class="btnrow"><button class="ghost" id="reset">Reset all progress</button></div>
+  </div>
+</section>
+
+</div>
+<div id="tip" role="tooltip"></div>
+<footer>Fork in the Road · an unofficial companion to the Hugging Face Diffusion Models Course · real math, a toy square · <a href="https://github.com/bakulbadwal/fork-in-the-road" style="color:#DDF0CF">source</a></footer>
+
+<script src="js/core.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/glossary.js"></script>
+<script src="js/art.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
