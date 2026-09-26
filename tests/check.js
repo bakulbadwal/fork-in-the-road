@@ -58,6 +58,19 @@ var v0 = FR.flowVelocity([1.2, -0.7], 0, comps, S.BASIS2);
 console.log("v(x, t=0) + x = mean?", v0.v.map(function (v, i) { return f(v + [1.2, -0.7][i], 4); }), "· weights at t=0 uniform:", f(Math.max.apply(null, v0.w) - Math.min.apply(null, v0.w), 6));
 var one = FR.flowSample({ K: 1, comps: comps, basis: S.BASIS2, D: 2, n: 3, seed: 5 });
 console.log("K=1 lands on the mean:", one.map(function (c) { return c.x.map(function (v) { return f(v, 3); }).join(","); }).join(" | "));
+// same fog, same pin: with the exact field, DDIM (η = 0) and flow matching integrate the same ODE in different coordinates
+[10, 50].forEach(function (K) {
+  var fl = S.run2d({ K: K, flow: true, fx: 0 }), dd = S.run2d({ K: K, eta: 0, sch: cos, fx: 0 }), same = 0, gap = 0, stD = 0;
+  var ts = FR.timesteps(K);
+  fl.chains.forEach(function (c, i) {
+    var d = dd.chains[i], cl = S.classify(c.x[0], c.x[1], 0, fl.comps), cd = S.classify(d.x[0], d.x[1], 0, dd.comps);
+    if (cl === cd) same++; gap = Math.max(gap, Math.hypot(c.x[0] - d.x[0], c.x[1] - d.x[1]));
+    // DDIM's trail redrawn in flow's coordinates: x_flow = x_DDIM / (√ᾱ + √(1−ᾱ))
+    var tr = d.trail.map(function (p, s) { var ab = s < ts.length ? FR.abAt(cos, ts[s]) : 1, den = Math.sqrt(ab) + Math.sqrt(1 - ab); return [p[0] / den, p[1] / den]; });
+    stD += FR.straightness(tr);
+  });
+  console.log(" K=" + K + ": same side " + same + "/600 · max gap between the two pins " + f(gap, 3) + " · DDIM's trails redrawn in flow's coordinates: straightness " + f(stD / 600, 3) + " (flow's own " + f(fl.straightness, 3) + ", DDIM's own " + f(dd.straightness, 3) + ")");
+});
 console.log("drive with flow cards:");
 var fbase = { policy: "flow", K: 10, Ta: 8, lookout: true, msPerPass: 10, sch: cos, cartAt: S.still(0), seed: 3 };
 [1, 2, 5, 10].forEach(function (K) { var r = S.fleet(Object.assign({}, fbase, { K: K }), 20); console.log(" flow K=" + K + ": hits " + r.hits + "/20 · flips " + f(r.flips, 2) + " · time " + f(r.time, 1) + " s"); });

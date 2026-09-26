@@ -245,7 +245,7 @@
       if (st.avg) { ctx.strokeStyle = COL.cart; ctx.lineWidth = 3; ctx.setLineDash([10, 6]); ctx.beginPath(); ctx.moveTo(X(st.avg[0]), Y(S.START_Y)); ctx.lineTo(X(st.avg[0]), Y(S.GOAL_Y)); ctx.stroke(); ctx.setLineDash([]); }
       fogLayer(st.fog || 0);
       if (st.field) {
-        ctx.strokeStyle = COL.left; ctx.fillStyle = COL.left; ctx.lineWidth = Math.max(1, W / 400); ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = COL.line; ctx.fillStyle = COL.line; ctx.lineWidth = Math.max(1, W / 400); ctx.globalAlpha = 0.75;
         st.field.forEach(function (a) {
           var m = Math.sqrt(a.vx * a.vx + a.vy * a.vy); if (m < 1e-9) return;
           var len = Math.min(0.34, m * 0.11), ux = a.vx / m, uy = a.vy / m, x1 = a.x + ux * len, y1 = a.y + uy * len;
@@ -404,7 +404,8 @@
       var pts = chains.map(function (c) { var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)], x = a[0] + (b2[0] - a[0]) * u, y = a[1] + (b2[1] - a[1]) * u; return { x: x, y: y, col: done ? cl(c) : COL.fog }; });
       var trails = $("s3trail").checked ? chains.slice(0, 30).map(function (c) { var tp = c.trail.slice(0, pass + 1).map(function (p) { return [p[0], p[1]]; }); var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)]; tp.push([a[0] + (b2[0] - a[0]) * u, a[1] + (b2[1] - a[1]) * u]); return { pts: tp, col: done ? cl(c) : COL.fog }; }) : null;
       var guess = $("s3guess").checked && !done ? chains.map(function (c) { return c.guesses[Math.min(pass, c.guesses.length - 1)]; }) : null;
-      view.render({ fx: 0, routes: done, pts: pts, trails: trails, guess: guess, fog: done ? 0 : 1 - (pass + u) / run.K, caption: done ? run.K + " pass" + (run.K > 1 ? "es" : "") + " · " + (run.eta ? "DDPM-like η = 1" : "DDIM η = 0") + " · " + run.sch : "pass " + (pass + 1) + " of " + run.K });
+      var ts = FR.timesteps(run.K), f0 = Math.sqrt(1 - FR.abAt(SCH[run.sch], ts[pass])), f1 = pass + 1 < run.K ? Math.sqrt(1 - FR.abAt(SCH[run.sch], ts[pass + 1])) : 0;   // the fog's actual volume at this pass
+      view.render({ fx: 0, routes: done, pts: pts, trails: trails, guess: guess, fog: done ? 0 : f0 + (f1 - f0) * u, caption: done ? run.K + " pass" + (run.K > 1 ? "es" : "") + " · " + (run.eta ? "DDPM-like η = 1" : "DDIM η = 0") + " · " + run.sch : "pass " + (pass + 1) + " of " + run.K });
     }
     $("s3go").onclick = function () {
       if (running) running.stop();
@@ -524,7 +525,7 @@
       $("s6fa").textContent = (f.n - f.hits) + " / 20"; $("s6fh").textContent = f.hits + " / 20"; $("s6ff").textContent = fmt(f.flips, 2); $("s6ftm").textContent = fmt(f.time, 1);
       touch("s6");
     }
-    seg($("s6pol"), [{ v: "diffusion", label: "the cartographer (diffusion, DDIM)" }, { v: "flow", label: "the cartographer (arrows, flow matching)" }, { v: "averager", label: "the clerk (average)" }], o.policy, function (v) { o.policy = v; });
+    seg($("s6pol"), [{ v: "diffusion", label: "the cartographer (diffusion, DDIM)" }, { v: "flow", label: "the cartographer (arrows, flow matching · step 7)" }, { v: "averager", label: "the clerk (average)" }], o.policy, function (v) { o.policy = v; });
     seg($("s6k"), [1, 2, 5, 10, 50].map(function (k) { return { v: k, label: String(k) }; }), o.K, function (v) { o.K = +v; });
     seg($("s6ta"), [1, 4, 8, 16].map(function (k) { return { v: k, label: String(k) }; }), o.Ta, function (v) { o.Ta = +v; });
     $("s6look").addEventListener("change", function () { o.lookout = this.checked; });
@@ -539,7 +540,7 @@
   /* ================= STEP 7: arrows, not guesses (flow matching) ================= */
   var FLOW_K = [1, 2, 3, 4, 5, 10, 20, 50], flowLadder = null;
   function initS7() {
-    var vf = SquareView("s7f"), vd = SquareView("s7d"), vw = SquareView("s7w"), t = 0, K = 4, running = null, last = null, comps = S.map2d(0);
+    var vf = SquareView("s7f"), vd = SquareView("s7d"), vw = SquareView("s7w"), t = 0, K = 10, running = null, last = null, comps = S.map2d(0);
     function field() {
       var t2 = Math.min(t, 0.95), arrows = [], step = 0.4;
       for (var gx = -2.6; gx <= 2.61; gx += step) for (var gy = -2.6; gy <= 2.61; gy += step) { var f = FR.flowVelocity([gx, gy], t2, comps, S.BASIS2); arrows.push({ x: gx, y: gy, vx: f.v[0], vy: f.v[1] }); }
@@ -551,28 +552,41 @@
     }
     $("s7t").addEventListener("input", function () { t = +this.value; field(); touch("s7"); });
     function idle() { vd.render({ fx: 0, routes: true, caption: "DDIM · press Lift both" }); vw.render({ fx: 0, routes: true, caption: "flow matching · press Lift both" }); }
+    // the same fog point, lifted both ways: does it end on the same side, and how far apart are its two pins?
+    function agree(run) {
+      var same = 0, gap = 0;
+      run.f.chains.forEach(function (c, i) { var d = run.d.chains[i]; if (S.classify(c.x[0], c.x[1], 0, run.f.comps) === S.classify(d.x[0], d.x[1], 0, run.d.comps)) same++; gap = Math.max(gap, Math.hypot(c.x[0] - d.x[0], c.x[1] - d.x[1])); });
+      return { same: same, gap: gap };
+    }
     function ladder() {
-      if (!flowLadder) flowLadder = FLOW_K.map(function (k) { return { K: k, d: S.run2d({ K: k, eta: 0, sch: SCH.cosine, fx: 0 }), f: S.run2d({ K: k, flow: true, fx: 0 }) }; });
-      $("s7lad").innerHTML = "<tr><th>passes</th><th>DDIM · in the cart</th><th>flow · in the cart</th><th>DDIM · straightness</th><th>flow · straightness</th></tr>" + flowLadder.map(function (r) {
-        return '<tr class="' + (r.K === K ? "now" : "") + '"><td class="n">' + r.K + '</td><td class="n" style="color:' + cartCol(r.d.tally.cart) + '">' + pct(r.d.tally.cart / 600) + (r.d.tally.cart && r.d.tally.cart < 12 ? " (" + r.d.tally.cart + ")" : "") + '</td><td class="n" style="color:' + cartCol(r.f.tally.cart) + '">' + pct(r.f.tally.cart / 600) + (r.f.tally.cart && r.f.tally.cart < 12 ? " (" + r.f.tally.cart + ")" : "") + "</td><td>" + r.d.straightness.toFixed(2) + "</td><td>" + r.f.straightness.toFixed(2) + "</td></tr>";
+      if (!flowLadder) flowLadder = FLOW_K.map(function (k) { var r = { K: k, d: S.run2d({ K: k, eta: 0, sch: SCH.cosine, fx: 0 }), f: S.run2d({ K: k, flow: true, fx: 0 }) }; r.a = agree(r); return r; });
+      $("s7lad").innerHTML = "<tr><th>passes</th><th>DDIM · in the cart</th><th>flow · in the cart</th><th>same side, both ways</th><th>straightness · DDIM</th><th>straightness · flow</th></tr>" + flowLadder.map(function (r) {
+        return '<tr class="' + (r.K === K ? "now" : "") + '"><td class="n">' + r.K + '</td><td class="n" style="color:' + cartCol(r.d.tally.cart) + '">' + pct(r.d.tally.cart / 600) + (r.d.tally.cart && r.d.tally.cart < 12 ? " (" + r.d.tally.cart + ")" : "") + '</td><td class="n" style="color:' + cartCol(r.f.tally.cart) + '">' + pct(r.f.tally.cart / 600) + (r.f.tally.cart && r.f.tally.cart < 12 ? " (" + r.f.tally.cart + ")" : "") + '</td><td class="n">' + r.a.same + " / 600</td><td>" + r.d.straightness.toFixed(2) + "</td><td>" + r.f.straightness.toFixed(2) + "</td></tr>";
       }).join("");
+    }
+    // DDIM's fog thins with its actual noise weight √(1−ᾱ) at the pass's timestep; flow's thins with 1 − t exactly.
+    function fogAt(run, pass, u, flow) {
+      if (flow) return 1 - (pass + u) / run.K;
+      var ts = FR.timesteps(run.K), a0 = Math.sqrt(1 - FR.abAt(SCH.cosine, ts[pass])), a1 = pass + 1 < run.K ? Math.sqrt(1 - FR.abAt(SCH.cosine, ts[pass + 1])) : 0;
+      return a0 + (a1 - a0) * u;
     }
     function frameOne(view, run, pass, u, done, name) {
       var chains = run.chains, cl = function (c) { return classCol(S.classify(c.x[0], c.x[1], 0, run.comps)); };
       var pts = chains.map(function (c) { var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)]; return { x: a[0] + (b2[0] - a[0]) * u, y: a[1] + (b2[1] - a[1]) * u, col: done ? cl(c) : COL.fog }; });
       var trails = chains.slice(0, 30).map(function (c) { var tp = c.trail.slice(0, pass + 1).map(function (p) { return [p[0], p[1]]; }); var a = c.trail[pass], b2 = c.trail[Math.min(pass + 1, c.trail.length - 1)]; tp.push([a[0] + (b2[0] - a[0]) * u, a[1] + (b2[1] - a[1]) * u]); return { pts: tp, col: done ? cl(c) : COL.fog }; });
-      view.render({ fx: 0, routes: done, pts: pts, trails: trails, fog: done ? 0 : 1 - (pass + u) / run.K, caption: name + " · " + (done ? run.K + " pass" + (run.K > 1 ? "es" : "") : "pass " + (pass + 1) + " of " + run.K) });
+      view.render({ fx: 0, routes: done, pts: pts, trails: trails, fog: done ? 0 : fogAt(run, pass, u, name !== "DDIM"), caption: name + " · " + (done ? run.K + " pass" + (run.K > 1 ? "es" : "") : "pass " + (pass + 1) + " of " + run.K) });
     }
     function stats(run) {
+      var a = agree(run);
       $("s7dc").textContent = pct(run.d.tally.cart / 600); $("s7wc").textContent = pct(run.f.tally.cart / 600);
-      $("s7ds").textContent = run.d.straightness.toFixed(2); $("s7ws").textContent = run.f.straightness.toFixed(2);
-      $("s7st").innerHTML = "<b>" + run.K + "</b> pass" + (run.K > 1 ? "es" : "") + " · DDIM " + run.d.tally.cart + " of 600 in the cart · flow " + run.f.tally.cart + " of 600";
+      $("s7same").textContent = a.same + " / 600"; $("s7gap").textContent = a.gap.toFixed(2);
+      $("s7st").innerHTML = "<b>" + run.K + "</b> pass" + (run.K > 1 ? "es" : "") + " · DDIM " + run.d.tally.cart + " of 600 in the cart · flow " + run.f.tally.cart + " of 600 · " + a.same + " of 600 on the same side both ways";
     }
     $("s7go").onclick = function () {
       if (running) running.stop();
       var run = { K: K, d: S.run2d({ K: K, eta: 0, sch: SCH.cosine, fx: 0 }), f: S.run2d({ K: K, flow: true, fx: 0 }) }, pass = 0, per = Math.max(160, Math.min(800, 3000 / K));
       run.d.K = K; run.f.K = K; last = run; $("s7go").disabled = true;
-      $("s7dc").textContent = "–"; $("s7wc").textContent = "–"; $("s7ds").textContent = "–"; $("s7ws").textContent = "–";
+      $("s7dc").textContent = "–"; $("s7wc").textContent = "–"; $("s7same").textContent = "–"; $("s7gap").textContent = "–";
       function next() {
         $("s7st").innerHTML = "pass <b>" + (pass + 1) + " / " + run.K + "</b>";
         running = anim(per, function (u) { frameOne(vd, run.d, pass, ease(u), false, "DDIM"); frameOne(vw, run.f, pass, ease(u), false, "flow matching"); }, function () {
@@ -701,7 +715,9 @@
       var run = (/[?&]run=([a-z]+)/.exec(location.search) || [])[1];
       if (run === "lift" && start === "s3") $("s3go").click();
       if (run === "drive" && start === "s6") { $("s6push").checked = true; window.FRDrive.set("push", true); $("s6go").click(); }
-      if (run === "both" && start === "s7") { var b10 = document.querySelector('#s7k button[data-v="10"]'); if (b10) b10.click(); $("s7go").click(); }
+      if (run === "both" && start === "s7") $("s7go").click();
+      // Screenshot mode only: settle at the top once fonts, clicks and layout are done (headless Chrome otherwise drifts).
+      if (document.body.classList.contains("shot")) setTimeout(function () { window.scrollTo(0, 0); }, 700);
     }, 0);
   });
   window.addEventListener("resize", function () { redrawAll(); });

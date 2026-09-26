@@ -18,10 +18,10 @@ A delivery robot learns from a hundred human drives around a pretzel cart. Half 
 | **3 · Fog Lifts in Passes** | Denoise 600 pins from 600 fogs in 1, 2, 3, 5, 10 or 50 passes; DDIM η = 0 vs DDPM-like η = 1; the sampler's traces and per-pass guesses; a live ladder of passes against dents | 1 pass: 100% in the cart. 5: 2%. 10: 1 of 600. Each guess starts from a map that already leans, so the pin commits to a side. With the linear schedule two passes are 94% in the cart |
 | **4 · The Stopwatch** | Milliseconds per pass, pins per card, and the ladder with a waiting-share column | A card of 8 pins is 0.8 s of driving; 10 DDIM passes at 10 ms are 0.1 s, an eighth of it, and already enough. Walking the course's 1,000-step schedule would take 10 s |
 | **5 · The Lookout** | Park the cart anywhere; draw 600 pins with the report and 600 blindfolded, side by side | Conditioning: with the observation the pins go around today's cart; without it, around where it used to be, and 28% land in it at +1.0. FiLM vs Unit 2's channel concatenation |
-| **6 · Pin 16, Drive 8** | The courier drives: cartographer or clerk, 1–50 passes, 1–16 pins per card, lookout on or off, a vendor who pushes the cart mid-drive; 20-drive fleets with dents, side flips and time | Receding-horizon control on a diffusion sampler. Re-plan every pin and it dithers (1.9 flips a drive); drive 8 and it commits; drive all 16 and it can't react; blindfold it and half the drives dent |
-| **7 · Arrows** | The flow-matching velocity field over the square at any t; the same 600 fog points lifted by DDIM and by flow matching side by side, with thirty paths traced and a straightness measure; a ladder for both | Flow matching trains an arrow (the straight-line velocity from fog to pin) instead of a guess. At t = 0 every arrow points at the cart, so one stride is the clerk again. Few-stride performance matches DDIM's here (8% vs 11% in the cart at three), and the "straight path" is per training pair: the learned field bends at the fork (0.55 vs 0.87). What π0 (10 Euler steps) and GR00T N1 (4 steps) actually run |
+| **6 · Pin 16, Drive 8** | The courier drives: the cartographer (DDIM, or flow-matching arrows) or the clerk, 1–50 passes, 1–16 pins per card, lookout on or off, a vendor who pushes the cart mid-drive; 20-drive fleets with dents, side flips and time | Receding-horizon control on a diffusion sampler. Re-plan every pin and it dithers (1.9 flips a drive); drive 8 and it commits; drive all 16 and it can't react; blindfold it and half the drives dent |
+| **7 · Arrows** | The flow-matching velocity field over the square at any t; the same 600 fog points lifted by DDIM and by flow matching side by side, with thirty paths traced; a ladder for both with a same-side count | Flow matching trains an arrow (the straight-line velocity from fog to pin) instead of a guess. At t = 0 every arrow points at the cart, so one stride is the clerk again. With the exact field it is the same path as DDIM in different coordinates: the same fog reaches the same pin (600 of 600 at 50 strides), and the few-stride ladders differ by a few pins (8% vs 11% at three). The "straight path" is per training pair; the learned field bends at the fork, for both. What π0 (10 Euler steps) and GR00T N1 (4 steps) actually run |
 | **★ Review Board** | Three incident reports: the straight-liner, the ditherer, the slowpoke. Run the rule, pick a fix, re-drive 20 times, name the cause | The tempting wrong fixes (more data, more passes, a shorter card, a faster motor) fail for the reason the step taught |
-| **✓ Field Test** | Eight questions answered by operating the widgets | Proof it stuck |
+| **✓ Field Test** | Nine questions answered by operating the widgets | Proof it stuck |
 
 Each step has predict-then-reveal questions and a "say it out loud" line that unlocks once you've played. Every term has a tooltip with its plain meaning and its square equivalent. Progress is saved in your browser.
 
@@ -41,14 +41,14 @@ The interactive diffusion explainers are about images or about the geometry, and
 | Passes against a latency budget | ✓ | — | — | — |
 | Conditioning on an observation, with a blindfolded baseline | ✓ | ✓ same noise, different observation | — | text prompt |
 | Receding-horizon execution with re-planning and a moving obstacle | ✓ | ✓ 16 predict, 4 execute | — | — |
-| Guided lessons with predict-then-check, a capstone and a graded test | ✓ (16 predictions, 3 cases, 8 questions) | a 6-step guided cycle | — | — |
+| Guided lessons with predict-then-check, a capstone and a graded test | ✓ (19 predictions, 3 cases, 9 questions) | a 6-step guided cycle | — | — |
 | Tied to the Hugging Face course notebooks | ✓ | — | — | — |
 
 Cart-Pole Diffusion is the one to open next if you want to see a *learned* denoiser drive a plant in real time; Diffusion Explorer is the one for watching a real model train on a distribution you drew.
 
 ![Six hundred pins lifted from fog in ten passes, thirty of them with the sampler's path traced, with the ladder of passes against dents](docs/lift.png)
 
-![The same fog lifted by DDIM and by flow matching, side by side, with the ladder of passes against dents and straightness for both](docs/arrows.png)
+![The same fog lifted by DDIM and by flow matching, side by side, with the ladder of passes against dents and the count of fog points that end on the same side both ways](docs/arrows.png)
 
 ## Run it
 

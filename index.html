@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Grandstander:wght@700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
-<script>/* Step links use "#/s3" so the hash never matches an element id and the browser never fragment-jumps. Rewrite the legacy form before the body parses. */(function(){var h=location.hash;if(/^#(s[0-6]|cap|ft)$/.test(h))history.replaceState(null,"","#/"+h.slice(1));})();</script>
+<script>/* Step links use "#/s3" so the hash never matches an element id and the browser never fragment-jumps. Rewrite the legacy form before the body parses. */(function(){var h=location.hash;if(/^#(s[0-7]|cap|ft)$/.test(h))history.replaceState(null,"","#/"+h.slice(1));})();</script>
 </head>
 <body>
 <!--
@@ -353,7 +353,7 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
   <div class="card">
     <div class="scene" data-art="s6"></div>
     <h2>6 · Pin 16, drive 8, look again: the robot drives</h2>
-    <p class="lede">Everything so far, put on the road. The cartographer no longer draws one dot: she draws a <span class="g" data-g="chunk">card of 16 pins</span> (the paper's T<sub>p</sub> = 16), the courier drives the first 8 (<span class="g" data-g="horizon">T<sub>a</sub> = 8</span>), then the lookout sends a fresh report and she draws a new card. Predict a short horizon, execute the first part, re-plan: <span class="g" data-g="receding">receding-horizon control</span>, the model-predictive-control idea running on a diffusion sampler. Every card here is denoised from fresh fog with the passes you pick (DDIM, η = 0). Benchmarked across 15 tasks from 4 suites, the paper's policy beat the prior state of the art by 46.9% on average. The newer action heads in π0 and GR00T N1 swap diffusion for <span class="g" data-g="flow">flow matching</span>, a relative that needs fewer passes; the picture is the same.</p>
+    <p class="lede">Everything so far, put on the road. The cartographer no longer draws one dot: she draws a <span class="g" data-g="chunk">card of 16 pins</span> (the paper's T<sub>p</sub> = 16), the courier drives the first 8 (<span class="g" data-g="horizon">T<sub>a</sub> = 8</span>), then the lookout sends a fresh report and she draws a new card. Predict a short horizon, execute the first part, re-plan: <span class="g" data-g="receding">receding-horizon control</span>, the model-predictive-control idea running on a diffusion sampler. Every card here is denoised from fresh fog with the passes you pick: DDIM at η = 0, or Euler strides if you choose arrows, which step 7 explains. Benchmarked across 15 tasks from 4 suites, the paper's policy beat the prior state of the art by 46.9% on average. The newer action heads in π0 and GR00T N1 swap diffusion for <span class="g" data-g="flow">flow matching</span>, a relative with a straight-line target and a few Euler strides; step 7 shows it's the same picture.</p>
     <p class="covers">Covers <b>Diffusion Policy §3</b>: T<sub>o</sub> = 2, T<sub>p</sub> = 16, T<sub>a</sub> = 8, DDIM at 10 steps · <b>§4.3</b>: the trade-off in T<sub>a</sub> · model-predictive control's receding horizon</p>
   </div>
   <div class="card" data-shot>
@@ -419,12 +419,12 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
   <div class="card">
     <div class="scene" data-art="s7"></div>
     <h2>7 · Arrows, not guesses: flow matching</h2>
-    <p class="lede">Diffusion asks the cartographer for a guess: what does the clean sheet look like? <span class="g" data-g="flow">Flow matching</span> asks her for an arrow: which way, and how fast, should this pin move to get there? The path is <em>defined</em> as a straight line from a fog point ε to a pin x₁, x<sub>t</sub> = (1 − t)·ε + t·x₁ for t from 0 to 1, and the network is trained to output that line's <span class="g" data-g="velocity">velocity</span>, x₁ − ε. Sampling is following the arrows: start in fog, take one <span class="g" data-g="euler">Euler</span> stride along the current arrow, ask again. The action experts of π0 and GR00T N1 work this way, so this is the version of the fork you'll meet in a 2025 robot. It isn't in the course, which is why it comes last.</p>
-    <p class="covers">Not in the course (notebook 02 mentions a different "velocity" objective in passing) · <b>Lipman et al., Flow Matching for Generative Modeling (2023)</b> · <b>π0 §IV</b> and <b>GR00T N1 §2.2</b>: the action experts</p>
+    <p class="lede">Diffusion asks the cartographer for a guess: what does the clean sheet look like? <span class="g" data-g="flow">Flow matching</span> asks her for an arrow: which way, and how fast, should this pin move to get there? The path is <em>defined</em> as a straight line from a fog point ε to a pin x₁, x<sub>t</sub> = (1 − t)·ε + t·x₁ for t from 0 to 1, and the network is trained to output that line's <span class="g" data-g="velocity">velocity</span>, x₁ − ε. Sampling is following the arrows: start in fog, take one <span class="g" data-g="euler">Euler</span> stride along the current arrow, ask again. The action experts of π0 and GR00T N1 work this way, so this is the version of the fork you'll meet in a 2025 robot. It isn't in the course, which is why it comes last. One honesty note up front: with a perfectly trained network the arrow is computed from the same guess step 2 taught, v = (x̂₁ − x) ÷ (1 − t), so it isn't a different kind of knowledge. It's a different target to train on and a different path to follow, which changes the recipe (no noise schedule to pick, uniform strides) more than it changes the answer.</p>
+    <p class="covers">Not in the course (notebook 02 mentions a different "velocity" objective in passing) · <b>Lipman et al., Flow Matching for Generative Modeling (2023)</b> · <b>π0 §IV</b> and <b>GR00T N1 §2.1</b>: the action experts</p>
   </div>
   <div class="card">
     <h3>The arrow field</h3>
-    <p class="lede">Every point on the map gets an arrow: the exact best straight-line velocity, averaged over every pin the point could still become. Slide t from pure fog toward the clean map and watch where the arrows point.</p>
+    <p class="lede">Every point on the map gets an arrow: the exact best straight-line velocity, averaged over every pin the point could still become. Slide t from pure fog toward the clean map and watch where the arrows point. Arrow length shows speed, capped for legibility; the chalk box has one dot's exact numbers.</p>
     <div class="pg">
       <div class="panel">
         <div class="sl"><div class="sl-h"><span>t: 0 is pure fog, 1 is the clean map</span><b id="s7tv">0.00</b></div><input type="range" id="s7t" min="0" max="0.95" step="0.01" value="0" aria-label="Flow time t"></div>
@@ -432,7 +432,7 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
         <div class="callout co-r"><b>At t = 0 every arrow points at the same spot:</b> the average of every route, the cart. That's the smudge again, in arrow form. One Euler stride of length 1 lands exactly on it: the clerk, once more. The arrows only start to disagree, some left and some right, once the pins have moved and t has grown.</div>
       </div>
       <div><canvas id="s7f" class="sq" aria-label="The flow-matching velocity field over the square, with the 600 pins at time t"></canvas>
-      <div class="legend"><span><span class="dot" style="background:var(--left)"></span>arrow: the field</span><span><span class="dot" style="background:var(--right)"></span>a pin from a right drive, at x_t</span></div></div>
+      <div class="legend"><span><span class="dot" style="background:var(--line)"></span>arrow: the field</span><span><span class="dot" style="background:var(--left)"></span>a pin from a left drive, at x_t</span><span><span class="dot" style="background:var(--right)"></span>a pin from a right drive, at x_t</span></div></div>
     </div>
     <div class="predict" data-p="s7a">
       <div class="tag">Guess first!</div>
@@ -443,33 +443,35 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
   </div>
   <div class="card" data-shot>
     <h3>The same fog, two samplers</h3>
-    <p class="lede">The same 600 fog points, lifted two ways: DDIM's passes on the left, flow matching's Euler strides on the right, with the same number of each. Thirty of the 600 have their path through the fog traced. <span class="g" data-g="straight">Straightness</span> is chord ÷ path length: 1 would be a straight line.</p>
+    <p class="lede">The same 600 fog points, lifted two ways: DDIM's passes on the left, flow matching's Euler strides on the right, with the same number of each. Thirty of the 600 have their path through the fog traced. Watch where each fog point ends up on the two maps.</p>
     <div class="panel">
       <div class="row"><span class="lbl" style="margin:0">Passes / strides (K)</span><div class="seg" id="s7k" style="margin:0"></div><button class="act" id="s7go">Lift both</button><span class="status" id="s7st"></span></div>
     </div>
     <div class="grid g2">
       <div><canvas id="s7d" class="sq" aria-label="DDIM: 600 pins lifted from fog, thirty traced"></canvas>
-        <div class="grid g2" style="margin-top:8px"><div class="stat"><div class="v bad" id="s7dc">–</div><div class="l">DDIM · inside the cart</div></div><div class="stat"><div class="v acc" id="s7ds">–</div><div class="l">DDIM · straightness</div></div></div></div>
+        <div class="grid g2" style="margin-top:8px"><div class="stat"><div class="v bad" id="s7dc">–</div><div class="l">DDIM · inside the cart</div></div><div class="stat"><div class="v good" id="s7same">–</div><div class="l">fog points that end on the same side, both ways</div></div></div></div>
       <div><canvas id="s7w" class="sq" aria-label="Flow matching: the same 600 pins, thirty traced"></canvas>
-        <div class="grid g2" style="margin-top:8px"><div class="stat"><div class="v bad" id="s7wc">–</div><div class="l">flow · inside the cart</div></div><div class="stat"><div class="v acc" id="s7ws">–</div><div class="l">flow · straightness</div></div></div></div>
+        <div class="grid g2" style="margin-top:8px"><div class="stat"><div class="v bad" id="s7wc">–</div><div class="l">flow · inside the cart</div></div><div class="stat"><div class="v acc" id="s7gap">–</div><div class="l">largest gap between a fog point's two pins</div></div></div></div>
     </div>
     <div class="tablewrap"><table class="ladder" id="s7lad"></table></div>
-    <div class="callout co-i"><b>What the robots actually run.</b> π0 (Physical Intelligence, 2024): a 300M-parameter flow-matching action expert on a 3B vision-language model; noisy actions A<sup>τ</sup> = τ·A + (1−τ)·ε, target A − ε, τ drawn from a beta distribution that emphasises the foggier end, forward Euler with 10 steps (δ = 0.1), cards of H = 50 actions at up to 50 Hz. GR00T N1 (NVIDIA, 2025): the same construction with the opposite sign convention for the target (ε − A), forward Euler with K = 4 steps, cards of 16 actions in 63.9 ms on an L40 in bf16, 2.2B parameters in total.</div>
+    <div class="chartcap"><span class="g" data-g="straight">Straightness</span> is chord ÷ path length, measured in each sampler's own coordinates, so the two columns can't be compared with each other (one stride is a single segment, 1.00 by construction). Redraw DDIM's paths in flow matching's coordinates and they score 0.56 at 50 passes, the same as flow's own 0.55.</div>
+    <div class="callout co-g"><b>The same path, drawn two ways.</b> With the exact field, DDIM at η = 0 and flow matching's Euler strides integrate the same continuous path in different coordinates (x<sub>flow</sub> = x<sub>DDIM</sub> ÷ (√ᾱ + √(1−ᾱ))), so the same fog point reaches the same pin: 599 of 600 on the same side at 10 strides, 600 of 600 at 50, with the two pins within 0.02 of each other. What differs is where each sampler places its strides, which is why the few-stride rungs of the ladder differ by a few pins. The straight line is a promise about each training pair, one fog point to one pin; the learned field, for either sampler, is the average of those lines, and at a fork the average bends. Rectified flow's "reflow" (re-pair fog points with the pins they actually reach and train again) is what straightens it; this lab draws the first pass only.</div>
+    <div class="callout co-i"><b>What the robots actually run.</b> π0 (Physical Intelligence, 2024): a 300M-parameter flow-matching action expert on a 3B vision-language model; noisy actions A<sup>τ</sup> = τ·A + (1−τ)·ε, target A − ε, τ drawn from a beta distribution that emphasises the foggier end, forward Euler with 10 steps (δ = 0.1), cards of H = 50 actions at up to 50 Hz. GR00T N1 (NVIDIA, 2025): the same construction and the same target (its paper prints ε − A, but its update rule and its released code use A − ε), forward Euler with K = 4 steps, cards of 16 actions in 63.9 ms on an L40 in bf16, 2.2B parameters in total.</div>
     <div class="predict" data-p="s7b">
       <div class="tag">Guess first!</div>
       <div class="q">Three passes from the same fog. Which sampler leaves fewer pins in the cart?</div>
       <div class="opts"><button data-a="0">DDIM</button><button data-a="1" data-right>Flow matching, slightly</button><button data-a="2">Exactly the same</button></div>
-      <div class="why">Flow matching, slightly: 8% against DDIM's 11% (48 vs 66 of 600). At five it's 1% vs 2%; by ten both are at 1 or 2 of 600. In this toy they are close cousins: both start at the average and commit in passes. GR00T N1 runs 4 Euler steps and π0 runs 10; the ladder says 4 is already within a few pins of 10 here.</div>
+      <div class="why">Flow matching, slightly: 8% against DDIM's 11% (48 vs 66 of 600). At four it's 3% vs 5% (15 vs 28), at five 1% vs 2%; by ten both are at 1 or 2 of 600. They are the same path drawn two ways, and the small gaps come from where each sampler places its strides. GR00T N1 runs 4 Euler steps (15 of 600 here) and π0 runs 10 (2 of 600): close, not equal.</div>
     </div>
     <div class="predict" data-p="s7c">
       <div class="tag">Guess first!</div>
-      <div class="q">Flow matching is sold on straight paths. Measured as chord ÷ path length at 10 passes, whose paths are straighter here?</div>
-      <div class="opts"><button data-a="0">Flow matching's</button><button data-a="1" data-right>DDIM's</button><button data-a="2">Identical</button></div>
-      <div class="why">DDIM's: 0.87 against 0.55. The straight line is a promise about each training pair, one fog point to one pin. The field the network learns is the average of those lines, and at a fork the average of a line going left and a line going right bends: at t = 0 every arrow points at the cart, so a pin that ends up left has to swing away from its first heading, and the trace shows the bend. Rectified flow's answer is to re-pair fog points with the pins they actually reach and train again ("reflow"), which straightens the field; this lab draws the first pass only.</div>
+      <div class="q">Lift the same 600 fog points with 50 DDIM passes and with 50 Euler strides. How many end on the same side of the cart both ways?</div>
+      <div class="opts"><button data-a="0">About half: the samplers disagree</button><button data-a="1" data-right>All 600</button><button data-a="2">Only the ones that started far from the cart</button></div>
+      <div class="why">All 600, with the two pins within 0.02 of each other. With the exact field they are one path in two coordinate systems, so where a fog point ends up is fixed by the fog point, not by the sampler. The "straight path" flow matching is sold on is a promise about each training pair; the learned field averages those lines and bends at the fork, for both samplers. That is why the two straightness columns in the ladder only mean something inside their own coordinates.</div>
     </div>
     <div class="say" data-say="s7">
       <div class="tag">Say it out loud</div>
-      <div class="line">Flow matching trains an arrow, the straight-line velocity from fog to pin, and samples by following it in a few Euler strides. Same fork, same average at t = 0, same commitment in passes. The straightness is per pair; the fork bends the field.</div>
+      <div class="line">Flow matching trains an arrow, the straight-line velocity from fog to pin, and follows it in a few Euler strides. Same fork, same average at t = 0, and with the exact field the same path as DDIM in different coordinates: the same fog reaches the same pin. The straight line is per pair; the learned field bends at the fork, for both.</div>
     </div>
   </div>
 </section>

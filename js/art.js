@@ -366,7 +366,7 @@
     s += label(40, 224, "at t = 0 every arrow points at the cart:", null, { size: 15, fill: BAD });
     s += label(40, 248, "the average, again", null, { size: 15, fill: BAD });
     s += label(300, 340, "later, the arrows disagree: some left, some right, bending around the cart", null, { size: 15 });
-    s += label(300, 364, "the courier follows its arrow for one stride, then looks again (Euler)", null, { size: 15 });
+    s += label(300, 364, "each stride: move the pin along its arrow, then ask for a new arrow (Euler)", null, { size: 15 });
     return wrap("s7", "The cartographer at her table with two arrow sheets. On the first, marked t equals 0, every small arrow on the map points at the cart in the centre. On the second, marked t equals 0.7, the arrows curve left and right around the cart. A poster on the wall reads arrows in use: pi zero, 10 Euler steps, cards of 50; GR00T N1, 4 steps, cards of 16. The courier waits at the right.", s);
   };
   scenes.cap = function () {
