@@ -106,6 +106,19 @@ console.log("the split at 10,000 steps, seeds 7 / 8 / 9; the exact cartographer 
   console.log(" " + sp[0] + " left (" + Math.round(100 * sp[1]) + "%): apprentice left " + j(rs, function (r) { return r.k10.t.left; }) + " · cart " + j(rs, function (r) { return r.k10.t.cart; }) + " · loss " + j(rs, function (r) { return f(r.loss, 3); }) + " · exact left " + ex.t.left + " · expected " + Math.round(600 * sp[1]) + " ± " + Math.round(Math.sqrt(600 * sp[1] * (1 - sp[1]))));
 });
 [[25, "25/25"], [1, "1/49"]].forEach(function (sp) { var r = apprenticeG(sp[0], 30000, 7); console.log(sp[1] + " log, 30,000 steps, seed 7: loss " + f(r.loss, 3) + " · K=10 cart " + r.k10.t.cart + " · left " + r.k10.t.left + " · route distance " + f(r.k10.fi.onroute, 2)); });
+// G9: what the centred start at t = 899 costs. The true fog there is a prior pin fogged to 899, whose mean is sqrt(abar) x the map's mean.
+console.log("G9: the exact cartographer's left share by start, 20,000 chains, K=10 (K=50 rows: node tests/seeds.js)");
+function chainG(x, ts, pc, r) { for (var s = 0; s < ts.length; s++) { var t = ts[s], nx = s + 1 < ts.length ? ts[s + 1] : -1, aT = FR.abAt(cos, t), aS = nx < 0 ? null : FR.abAt(cos, nx); var d = FR.denoise(x, aT, pc, S.BASIS2); x = FR.ddimStep(x, d.x0, FR.epsFrom(x, d.x0, aT), aT, aS, 0, r.normal); } return x; }
+function startTrueG(pc, t, r) { var u = r(), acc = 0, k = 0; for (k = 0; k < pc.length; k++) { acc += Math.exp(pc[k].lp); if (u < acc) break; } if (k >= pc.length) k = pc.length - 1; var ab = FR.abAt(cos, t); var p = [pc[k].mu[0] + Math.sqrt(S.BASIS2.lam[0]) * r.normal(), pc[k].mu[1] + Math.sqrt(S.BASIS2.lam[1]) * r.normal()]; return [Math.sqrt(ab) * p[0] + Math.sqrt(1 - ab) * r.normal(), Math.sqrt(ab) * p[1] + Math.sqrt(1 - ab) * r.normal()]; }
+[0.5, 0.2, 0.1, 0.02].forEach(function (share) {
+  var pc = priorG(share), n = 20000, out = [];
+  [["centred at 899", FR.timestepsFrom(10, TM), false], ["true fog at 899", FR.timestepsFrom(10, TM), true], ["trailing from 999", FR.timesteps(10), false]].forEach(function (cfg, ci) {
+    var r = FR.rng(100 + ci), L = 0;
+    for (var i = 0; i < n; i++) { var x = cfg[2] ? startTrueG(pc, cfg[1][0], r) : [r.normal(), r.normal()]; x = chainG(x, cfg[1], pc, r); if (S.classify(x[0], x[1], 0, comps) === "left") L++; }
+    out.push(cfg[0] + " " + f(100 * L / n, 1) + "%");
+  });
+  console.log(" prior " + (100 * share) + "%: " + out.join(" · "));
+});
 
 console.log("\n== D. the lookout (conditioning) ==");
 [0.4, 0.7, 1.0].forEach(function (fx) {

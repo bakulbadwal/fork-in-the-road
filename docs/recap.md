@@ -7,7 +7,7 @@ Print this before a sitting. Every number is from the lab's own widgets (`ACCEPT
 1. **Forward:** x_t = √ᾱ_t·x₀ + √(1−ᾱ_t)·ε. A crossfader between the map and Gaussian fog, set by a schedule (cosine is half fog at t ≈ 500, linear at t ≈ 260).
 2. **Train:** pick a random t, add fog, have the network predict the fog, take the squared error. That is the whole objective.
 3. **Why passes:** from pure fog, the squared-error-best single guess is the average of everything (the cart). Small passes commit gradually to one side: 1 pass 100% in the cart, 5 passes 2%, 10 passes 1 in 600.
-4. **Sample:** start from fog and step with the sampler. DDIM does it in about 10 passes; flow matching's Euler strides follow the same path in different coordinates. A learned network's guess is clipped, and samplers start it a notch below pure fog: at t = 999 the guess formula divides by √ᾱ ≈ 0.00005.
+4. **Sample:** start from fog and step with the sampler. DDIM does it in about 10 passes; flow matching's Euler strides follow the same path in different coordinates. A learned network's clean guess is clipped (diffusers' `clip_sample`), because at t = 999 the guess formula divides by √ᾱ ≈ 0.00005 on the cosine schedule; diffusers' default "leading" spacing starts a notch lower instead.
 5. **Robots:** swap the image for a card of 16 waypoints, condition on what the camera sees, drive 8, look again. Same schedule, same loss. A regression policy averages the fork and dents the cart; a diffusion policy picks a side.
 
 ## The steps, in one line each
@@ -22,7 +22,7 @@ Print this before a sitting. Every number is from the lab's own widgets (`ACCEPT
 | 5 · The Lookout | Conditioning: with the observation, routes go around today's cart; blindfolded, around where it used to be. |
 | 6 · Pin 16, Drive 8 | Receding horizon: commit to a card for smoothness, re-plan for reactivity. Re-plan every pin and the courier dithers. |
 | 7 · Arrows | Flow matching trains a straight-line velocity; with the exact field it is DDIM's path in other coordinates. The learned field bends at a fork, for both. |
-| 8 · The Apprentice | Under-trained, she blurs the fork into the cart (a third of the pins at 300 steps, about ten at 10,000). Trained, she draws each side at the log's rate, rare sides included, and her one pass is the cart average like anyone's. The exact cartographer is the ceiling. |
+| 8 · The Apprentice | Under-trained, she blurs the fork into the cart (a third of the pins at 300 steps, about ten at 10,000). Trained, she draws each side about as often as the exact cartographer does through the same sampler, rare sides included, and her one pass (25/25 log, 10,000 steps) is the cart average like anyone's. The exact cartographer is the ceiling. |
 
 ## The paper numbers to remember
 

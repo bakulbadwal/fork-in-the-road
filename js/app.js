@@ -668,7 +668,7 @@
           drawLoss(); tags(ema); mathbox();
           more = trained < target;
           if (more) setTimeout(chunk, 0);
-          else $("s8st").innerHTML = "<b>" + fmt(trained, 0) + "</b> steps · loss " + ema.toFixed(2) + " (the floor is " + fl.map.toFixed(2) + " for the map, " + fl.log.toFixed(2) + " for this log) · now lift the fog";
+          else $("s8st").innerHTML = "<b>" + fmt(trained, 0) + "</b> steps · loss " + ema.toFixed(2) + " (the floor is " + fl.map.toFixed(2) + " for the map, " + fl.log.toFixed(2) + " for this log) · now lift the fog" + (o.nLeft !== trainedOn ? " · the slider moved while she trained: she learned the " + trainedOn + "-left log; press Train again for this one" : "");
         } catch (e) { more = false; $("s8st").innerHTML = "training stopped: " + (e && e.message ? e.message : e); }
         if (!more) { setBusy(false); touch("s8"); }
       })();
@@ -714,7 +714,7 @@
     var SPLITS = [25, 10, 5, 1];
     function study() {
       if (running) return; setBusy(true); var rows = [], i = 0;
-      function finish(msg) { setBusy(false); $("s8sst").innerHTML = msg; touch("s8"); }
+      function finish(msg) { setBusy(false); $("s8sst").innerHTML = msg; redrawAll(); touch("s8"); }
       function one() {
         var nLeft = SPLITS[i], d = demos(nLeft), n2 = N.create(32, 1), r = FR.rng(7), done = 0, tot = 10000;
         (function chunk() {
@@ -726,16 +726,18 @@
             rows.push({ share: 2 * nLeft, nLeft: nLeft, exLeft: ex.tally.left, apLeft: ap.tally.left, cart: ap.tally.cart, mean: 600 * share, sd: Math.sqrt(600 * share * (1 - share)) });
             renderStudy(rows); i++;
             if (i < SPLITS.length) { one(); return; }
-            finish("done · 10 passes each from t = 899 · training seed 7 (seeds 8 and 9 are in ACCEPTANCE.md, G5) · green: within two SD of the expected count");
+            finish("done · 10 passes each from t = 899, the same 600 fog points for both · training seed 7; ten seeds are in ACCEPTANCE.md, G5 · green: within two SD of the cartographer's count");
           } catch (e) { finish("study stopped: " + (e && e.message ? e.message : e)); }
         })();
       }
       one();
     }
+    // The reference is the exact cartographer's count through the same sampler and the same fog (not 600 × share: the centred start at
+    // t = 899 nudges a rare side up for both of them). Green: the apprentice is within two binomial SD of that count.
     function renderStudy(rows) {
-      $("s8lad").innerHTML = "<tr><th>drives that went left</th><th>expected left pins (600 × share ± one SD)</th><th>exact cartographer, same share as prior</th><th>apprentice, 10,000 steps</th><th>apprentice · in the cart</th></tr>" + rows.map(function (r) {
-        var col = function (n) { return Math.abs(n - r.mean) <= 2 * r.sd ? "#3B7422" : "#8A6300"; };
-        return "<tr><td class=\"n\">" + r.share + "% (" + r.nLeft + " of 50)</td><td>" + Math.round(r.mean) + " ± " + Math.round(r.sd) + "</td><td class=\"n\" style=\"color:" + col(r.exLeft) + "\">" + pct(r.exLeft / 600) + " (" + r.exLeft + ")</td><td class=\"n\" style=\"color:" + col(r.apLeft) + "\">" + pct(r.apLeft / 600) + " (" + r.apLeft + ")</td><td class=\"n\" style=\"color:" + cartCol(r.cart) + "\">" + r.cart + " of 600</td></tr>";
+      $("s8lad").innerHTML = "<tr><th>drives that went left</th><th>exact cartographer, same share as prior, same fog</th><th>apprentice, 10,000 steps</th><th>apprentice − cartographer</th><th>apprentice · in the cart</th></tr>" + rows.map(function (r) {
+        var p = r.exLeft / 600, sd = Math.sqrt(600 * p * (1 - p)), diff = r.apLeft - r.exLeft, col = Math.abs(diff) <= 2 * sd ? "#3B7422" : "#8A6300";
+        return "<tr><td class=\"n\">" + r.share + "% (" + r.nLeft + " of 50)</td><td>" + pct(r.exLeft / 600) + " (" + r.exLeft + ")</td><td class=\"n\" style=\"color:" + col + "\">" + pct(r.apLeft / 600) + " (" + r.apLeft + ")</td><td style=\"color:" + col + "\">" + (diff > 0 ? "+" : "") + diff + " (± " + Math.round(2 * sd) + " is noise)</td><td class=\"n\" style=\"color:" + cartCol(r.cart) + "\">" + r.cart + " of 600</td></tr>";
       }).join("");
     }
     $("s8left").addEventListener("input", function () { o.nLeft = +this.value; $("s8leftv").textContent = o.nLeft + " left · " + (50 - o.nLeft) + " right"; if (net && trained && !running && o.nLeft !== trainedOn) $("s8st").innerHTML = "she was trained on " + trainedOn + " left · press Train to teach her this log"; });

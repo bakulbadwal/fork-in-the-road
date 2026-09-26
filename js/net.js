@@ -41,7 +41,7 @@
   function predictEps(net, x, t) { return Array.prototype.slice.call(forward(net, features(x, t)).out); }
   // Her clean guess, from the noise prediction, as in step 2: x̂₀ = (x_t − √(1−ᾱ)·ε̂) / √ᾱ, clipped to the map.
   // The clip is what diffusers' `clip_sample` does: near t = 999, √ᾱ is about 0.00005, so any error in ε̂ is multiplied
-  // by 20,000 and a raw guess flies off the map. The exact denoiser never needs it; a learned one always does.
+  // by 20,000 and a raw guess flies off the map. The exact denoiser never needs it; a learned one does at t = 999 (from t = 899 a trained one needs none).
   var CLIP = 3;
   function predictX0(net, x, t, ab, clip) {
     var e = predictEps(net, x, t), a = Math.sqrt(ab), bq = Math.sqrt(1 - ab), c = clip == null ? CLIP : clip;

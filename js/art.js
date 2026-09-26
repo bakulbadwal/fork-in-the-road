@@ -392,7 +392,7 @@
     s += label(628, 90, "trained on the log with notebook 01's loop", null, { size: 14 });
     s += label(628, 114, "her loss falls toward the floor, never to zero", null, { size: 14, fill: BAD });
     s += label(320, 340, "give her a few hundred steps and pins blur into the cart", null, { size: 15 });
-    s += label(320, 364, "give her one drive in fifty on a side, and she draws it one time in fifty", null, { size: 15 });
+    s += label(320, 364, "give her one drive in fifty on a side, and she draws it about as often as the cartographer would", null, { size: 15 });
     return wrap("s8", "The cartographer at her big desk with a clean route sheet beside an apprentice at a smaller desk with a half-fogged sheet; on the apprentice's desk a thin stack of practice sheets labelled one drive and a thick one labelled forty-nine drives. A chalkboard on the wall shows a loss curve falling toward a dashed line marked the floor.", s);
   };
   scenes.cap = function () {
