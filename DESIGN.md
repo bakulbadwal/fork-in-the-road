@@ -25,6 +25,8 @@ Route colours are fixed across every canvas, dot, trail and readout: left is alw
 - **The passes ladder**: a small table of passes → share of routes in the cart, computed live for the chosen schedule and η; on step 4 it gains a time column and a budget line.
 - **The waypoint card** (step 6): sixteen pins along the road ahead of the courier; the executed ones turn yellow, the discarded ones stay white, and a new card is drawn at every re-plan.
 - **The drive HUD**: four price tags (clock, card number, what the courier is doing, dents) that tick during a drive.
+- **The arrow field** (step 7): small ink arrows on a grid over the square, showing the flow-matching velocity at the slider's t, with the pins riding their straight paths.
+- **The loss chalkboard** (step 8): a chart that draws while the apprentice trains, her smoothed loss against the exact cartographer's dashed floor, beside four price tags (loss, floor, weights, steps) and a chalk box working one training pair with live numbers.
 - **The incident folders** (review board): three cases pinned to a cork board, each with a rule to fix, a fleet re-drive and a named cause.
 
 ## Scenes

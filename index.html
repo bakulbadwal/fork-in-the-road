@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Grandstander:wght@700;800&family=Patrick+Hand&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
-<script>/* Step links use "#/s3" so the hash never matches an element id and the browser never fragment-jumps. Rewrite the legacy form before the body parses. */(function(){var h=location.hash;if(/^#(s[0-7]|cap|ft)$/.test(h))history.replaceState(null,"","#/"+h.slice(1));})();</script>
+<script>/* Step links use "#/s3" so the hash never matches an element id and the browser never fragment-jumps. Rewrite the legacy form before the body parses. */(function(){var h=location.hash;if(/^#(s[0-8]|cap|ft)$/.test(h))history.replaceState(null,"","#/"+h.slice(1));})();</script>
 </head>
 <body>
 <!--
@@ -476,6 +476,81 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
   </div>
 </section>
 
+<!-- ============ STEP 8 ============ -->
+<section id="s8" data-title="The Apprentice" data-n="8">
+  <div class="card">
+    <div class="scene" data-art="s8"></div>
+    <h2>8 · The apprentice: a real network learns the square</h2>
+    <p class="lede">Every cartographer so far has been the exact best guess, the answer a perfectly trained network converges to, which is what makes every number in this lab trustworthy. The course's notebooks do the opposite: they train a real network and watch it be imperfect. So here is an apprentice, a small real network (an <span class="g" data-g="mlp">MLP</span> with 1,474 weights) that learns the square exactly the way notebook 01 trains its UNet: foggy pin in, predict the fog, squared error, <span class="g" data-g="adam">Adam</span>, repeat. Train her on the dispatcher's log, then hand her the same fog the cartographer gets and compare. Everything she draws is measured, not asserted, and she is seeded, so she trains the same way for everyone.</p>
+    <p class="covers">Covers <b>notebook 01, step 5</b>: the training loop · <b>notebook 02, "Training the network"</b>: what a real model gets wrong · <b>diffusers</b>: <code>clip_sample</code></p>
+  </div>
+
+  <div class="card">
+    <h3>Train the apprentice</h3>
+    <div class="pg">
+      <div class="panel">
+        <div class="sl"><div class="sl-h"><span>the log: 50 drives, how many went left</span><b id="s8leftv">25 left · 25 right</b></div><input type="range" id="s8left" min="1" max="49" step="1" value="25" aria-label="Drives that went left, out of 50"></div>
+        <div class="lbl">Training steps (batches of 64 foggy pins)</div><div class="seg" id="s8steps"></div>
+        <div class="btnrow"><button class="act" id="s8go">Train</button><span class="status" id="s8st">nothing runs until you press Train</span></div>
+        <div class="grid g4" style="margin-top:8px">
+          <div class="stat"><div class="v" id="s8l">–</div><div class="l">her loss (mean squared error on the fog)</div></div>
+          <div class="stat"><div class="v good" id="s8floor">–</div><div class="l">the <span class="g" data-g="floorloss">floor</span>: the exact guess's loss</div></div>
+          <div class="stat"><div class="v" id="s8w">–</div><div class="l">weights</div></div>
+          <div class="stat"><div class="v acc" id="s8n">0</div><div class="l">steps trained</div></div>
+        </div>
+        <div class="mathbox"><div class="eq">loss = mean (ε̂ − ε)²</div><div class="eqn" id="s8m"></div></div>
+      </div>
+      <div><canvas id="s8loss" class="chart2" aria-label="Training loss against steps, with the exact cartographer's floor"></canvas>
+      <div class="chartcap"><span class="sw" style="background:var(--left)"></span>her loss, smoothed · <span class="sw" style="background:var(--grass-d)"></span>the floor · the curve draws while she trains</div>
+      <div class="callout co-i"><b>Why her loss can't reach zero.</b> A foggy pin could have come from several places, so even the exact best guess is wrong by 0.356 on average. That is the floor. Watch her curve flatten just above it: past 10,000 steps she is within a few percent of perfect, and the difference shows up in the pins, not in the loss.</div></div>
+    </div>
+  </div>
+
+  <div class="card" data-shot>
+    <h3>The same fog, two ways</h3>
+    <p class="lede">600 fog points lifted by the exact cartographer and by the apprentice as she is right now, with the same passes. Her clean guess is <span class="g" data-g="clip">clipped</span> to the map at every pass, as diffusers' <code>clip_sample</code> does; the count on the right says how often that clip had to catch a pin.</p>
+    <div class="panel"><div class="row"><span class="lbl" style="margin:0">Passes</span><div class="seg" id="s8k" style="margin:0"></div><button class="act" id="s8lift" disabled>Lift the fog, both ways</button></div></div>
+    <div class="grid g2">
+      <div><canvas id="s8e" class="sq" aria-label="The exact cartographer's 600 pins"></canvas>
+        <div class="grid g3" style="margin-top:8px"><div class="stat"><div class="v bad" id="s8ec">–</div><div class="l">in the cart</div></div><div class="stat"><div class="v left" id="s8el">–</div><div class="l">went left</div></div><div class="stat"><div class="v acc" id="s8er">–</div><div class="l">distance to the nearest route blob</div></div></div></div>
+      <div><canvas id="s8a" class="sq" aria-label="The apprentice's 600 pins"></canvas>
+        <div class="grid g4" style="margin-top:8px"><div class="stat"><div class="v" id="s8ac">–</div><div class="l">in the cart</div></div><div class="stat"><div class="v left" id="s8al">–</div><div class="l">went left</div></div><div class="stat"><div class="v" id="s8ar">–</div><div class="l">distance to the nearest route blob</div></div><div class="stat"><div class="v" id="s8off">–</div><div class="l">pins caught by the clip</div></div></div></div>
+    </div>
+    <div class="legend"><span><span class="dot" style="background:var(--left)"></span>went left</span><span><span class="dot" style="background:var(--right)"></span>went right</span><span><span class="dot" style="background:var(--cartred)"></span>in the cart</span><span>distance: the exact cartographer's pins sit 0.14 from a route blob on average</span></div>
+    <div class="callout co-w"><b>Try one pass.</b> The exact cartographer's one-shot answer is the tidy average in the cart. The apprentice's is 600 pins at the map's edge. From t = 999 the clean guess is (x<sub>t</sub> − √(1−ᾱ)·ε̂) ÷ √ᾱ with √ᾱ ≈ 0.00005, which multiplies any error in her ε̂ by 20,000. The exact guess has no error; hers always has some. That is why real samplers clip, why diffusers' "leading" spacing skips t = 999, and why passes are not optional for a learned model.</div>
+    <div class="predict" data-p="s8a">
+      <div class="tag">Guess first!</div>
+      <div class="q">Train her for 300 steps on a 25/25 log and lift with 10 passes. The exact cartographer leaves 1 pin in the cart. The apprentice?</div>
+      <div class="opts"><button data-a="0">About the same, 1 or 2</button><button data-a="1" data-right>A few dozen</button><button data-a="2">About half</button></div>
+      <div class="why">32 of 600, in a wide blur: her pins sit 0.44 from the nearest route blob on average against the cartographer's 0.14. At 3,000 steps: 15 in the cart, 0.21. At 10,000: none, 0.18. Under-training is the smudge in a softer form, not one averaged pin but a cloud that leaks into the cart.</div>
+    </div>
+    <div class="predict" data-p="s8b">
+      <div class="tag">Guess first!</div>
+      <div class="q">The apprentice after 10,000 steps, one pass from pure fog. Where do her pins land?</div>
+      <div class="opts"><button data-a="0">In the cart, the average, like the cartographer</button><button data-a="1" data-right>All 600 at the map's edge</button><button data-a="2">On the routes</button></div>
+      <div class="why">All 600 caught by the clip. One pass means one division by √ᾱ ≈ 0.00005, and her prediction is never exact. Ten passes never ask her for a one-shot answer from pure fog; each pass only has to be a little right.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>The split study: a rare side</h3>
+    <p class="lede">Four apprentices, 10,000 steps each, trained on logs where 50%, 20%, 10% and 2% of the drives went left, then the same fog lifted with 10 passes. The exact cartographer, given the same share as her prior, reproduces it; does the apprentice?</p>
+    <div class="btnrow"><button class="act" id="s8study">Run the split study (about 25 s)</button><span class="status" id="s8sst"></span></div>
+    <div class="tablewrap"><table class="ladder" id="s8lad"></table></div>
+    <div class="callout co-i"><b>What the study shows.</b> A balanced log comes back balanced (50% left, against the exact cartographer's 51%). A rare side is unreliable: 10 drives in 50 left comes back as 27%, 5 in 50 as 21%, 1 in 50 as 4%, and with 30,000 steps that 1-in-50 side falls to 1%, spread too thin for any of its blobs to get five pins. The exact cartographer reproduces any share, because she knows the true fork; the apprentice only knows the pins she was shown, and the ones she saw rarely she draws rarely, or too often, depending on how long she trained. A robot's rare demonstrations are its rare skills.</div>
+    <div class="predict" data-p="s8c">
+      <div class="tag">Guess first!</div>
+      <div class="q">One drive in fifty went left. After 30,000 steps, how often does the apprentice draw the left route?</div>
+      <div class="opts"><button data-a="0">2%, the true share</button><button data-a="1" data-right>About 1%, and no left blob gets five pins</button><button data-a="2">About 10%</button></div>
+      <div class="why">7 of 600 (1%), and none of the left route's six blobs collects five pins. At 10,000 steps the same log gives 4% and two blobs; at 5 drives in 50 she over-draws the left at 21% for a true 10%. The exact cartographer with a 10% prior draws it at 8%.</div>
+    </div>
+    <div class="say" data-say="s8">
+      <div class="tag">Say it out loud</div>
+      <div class="line">A real denoiser is only as good as its training. Too few steps and the pins blur into the cart; a rare side gets drawn too often or too little; and from pure fog her one-shot guess is garbage, which is why samplers clip and take passes. The exact cartographer is the ceiling; the apprentice is what you'd deploy.</div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ REVIEW BOARD ============ -->
 <section id="cap" data-title="Review Board" data-n="★">
   <div class="card">
@@ -491,15 +566,15 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
 <section id="ft" data-title="Field Test" data-n="✓">
   <div class="card">
     <h2>✓ Field test</h2>
-    <p class="lede">Nine questions. Answer each by operating the widget in the step named, not from memory. Seven or more earns the check.</p>
+    <p class="lede">Ten questions. Answer each by operating the widget in the step named, not from memory. Eight or more earns the check.</p>
     <div id="ftqs"></div>
     <div class="btnrow"><button class="act" id="ftgo">Grade me</button><span id="ftscore" style="font:18px var(--hand);align-self:center"></span></div>
   </div>
   <div class="card">
     <h3>What's exact here, and what's a teaching model</h3>
     <ul class="honest">
-      <li><b>Exact, real math:</b> the forward process x_t = √ᾱ·x₀ + √(1−ᾱ)·ε; the linear and cosine (<code>squaredcos_cap_v2</code>) schedules built the way diffusers builds them; the denoiser, which is the exact Bayes posterior mean E[x₀ | x_t] for the toy demonstration distribution (what a perfectly trained noise-prediction network converges to, with no training error); the ε ↔ x̂₀ conversion; DDIM sampling with η (Song et al., 2021, eq. 12) on diffusers' "trailing" timestep spacing (999, 899, …; its <code>DDIMScheduler</code> defaults to "leading"); the mixture mean as the squared-error-optimal single guess; flow matching's exact marginal velocity field for the same toy data, followed with forward Euler; the straightness measure; and every number quoted from the Diffusion Policy, π0 and GR00T N1 papers.</li>
-      <li><b>Teaching models, labelled on the page:</b> the square, the two demonstrated routes and how the demonstrators' choice of side leans with the courier's position are hand-designed; the courier teleports between checkpoints ten times a second; it stands still while a card is drawn; the vendor's push and pacing are one-number toys. No network is trained here, and nothing here predicts how a real Diffusion Policy run behaves.</li>
+      <li><b>Exact, real math:</b> the forward process x_t = √ᾱ·x₀ + √(1−ᾱ)·ε; the linear and cosine (<code>squaredcos_cap_v2</code>) schedules built the way diffusers builds them; the denoiser, which is the exact Bayes posterior mean E[x₀ | x_t] for the toy demonstration distribution (what a perfectly trained noise-prediction network converges to, with no training error); the ε ↔ x̂₀ conversion; DDIM sampling with η (Song et al., 2021, eq. 12) on diffusers' "trailing" timestep spacing (999, 899, …; its <code>DDIMScheduler</code> defaults to "leading"); the mixture mean as the squared-error-optimal single guess; flow matching's exact marginal velocity field for the same toy data, followed with forward Euler; the straightness measure; the apprentice's gradient (hand-written backprop, checked against finite differences) and Adam; and every number quoted from the Diffusion Policy, π0 and GR00T N1 papers.</li>
+      <li><b>Teaching models, labelled on the page:</b> the square, the two demonstrated routes and how the demonstrators' choice of side leans with the courier's position are hand-designed; the courier teleports between checkpoints ten times a second; it stands still while a card is drawn; the vendor's push and pacing are one-number toys. One network is trained here, the apprentice in step 8: a 1,474-weight MLP trained the notebook's way and seeded, so it trains the same for everyone (up to floating-point differences between browsers); what she draws is measured, not asserted. Nothing here predicts how a real Diffusion Policy run behaves.</li>
       <li><b>The directions are real; the courier isn't a real robot.</b> Real action chunks are joint positions or end-effector poses at 10–50 Hz, conditioned on camera frames, from a network trained on hundreds of demonstrations. The fork, the smudge, the passes, the budget and the re-planning are the same ideas at that scale.</li>
     </ul>
     <p class="muted" style="font-size:15px;margin-top:10px">Sources: the <a href="https://huggingface.co/learn/diffusion-course/unit1/1" target="_blank" rel="noopener">Hugging Face Diffusion Models Course, Unit 1</a> (both notebooks) · Ho, Jain &amp; Abbeel, <em>Denoising Diffusion Probabilistic Models</em> (2020) · Song, Meng &amp; Ermon, <em>Denoising Diffusion Implicit Models</em> (2021) · Nichol &amp; Dhariwal, <em>Improved DDPM</em> (2021) for the cosine schedule · Chi et al., <a href="https://arxiv.org/abs/2303.04137" target="_blank" rel="noopener"><em>Diffusion Policy: Visuomotor Policy Learning via Action Diffusion</em></a> (2023) for T<sub>p</sub>/T<sub>a</sub>/T<sub>o</sub>, DDIM at 10 steps, 0.1 s on an RTX 3080, FiLM, the square cosine schedule and the 46.9% figure · Lipman et al., <em>Flow Matching for Generative Modeling</em> (2023) · Liu, Gong &amp; Liu, <em>Flow Straight and Fast</em> (2022) for rectified flow and reflow · Black et al., <a href="https://arxiv.org/abs/2410.24164" target="_blank" rel="noopener"><em>π0: A Vision-Language-Action Flow Model</em></a> (2024) and NVIDIA, <a href="https://arxiv.org/abs/2503.14734" target="_blank" rel="noopener"><em>GR00T N1</em></a> (2025) for the flow-matching action experts, their step counts, chunk lengths and latency. Further reading: <a href="https://huggingface.co/blog/annotated-diffusion" target="_blank" rel="noopener">The Annotated Diffusion Model</a>, and <a href="https://huggingface.co/lerobot/diffusion_pusht" target="_blank" rel="noopener">lerobot/diffusion_pusht</a> for a real Diffusion Policy you can run.</p>
@@ -507,6 +582,7 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
   </div>
 </section>
 
+<p class="series">Part of a series of hands-on labs: <a href="https://bakulbadwal.github.io/inference-kitchen/">Inference Kitchen</a> (serving) · <a href="https://bakulbadwal.github.io/finishing-school/">Finishing School</a> (post-training) · <a href="https://bakulbadwal.github.io/arm-playground/">Arm Playground</a> (kinematics and control) · <a href="https://bakulbadwal.github.io/policy-pond/">Policy Pond</a> (reinforcement learning) · <b>Fork in the Road</b> (diffusion policies)</p>
 </div>
 <div id="tip" role="tooltip"></div>
 <footer>Fork in the Road · an unofficial companion to the Hugging Face Diffusion Models Course · real math, a toy square · <a href="https://github.com/bakulbadwal/fork-in-the-road" style="color:#DDF0CF">source</a></footer>
@@ -514,6 +590,7 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
 <script src="js/core.js"></script>
 <script src="js/sim.js"></script>
 <script src="js/glossary.js"></script>
+<script src="js/net.js"></script>
 <script src="js/art.js"></script>
 <script src="js/app.js"></script>
 </body>

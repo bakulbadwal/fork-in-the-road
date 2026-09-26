@@ -22,7 +22,7 @@ The interactive diffusion explainers are about images (Diffusion Explainer for S
 
 ## Operating context
 
-Used at a laptop in study sessions alongside the course's Unit 1 notebooks, and on a phone when shared. Steps are done in order (0–7, review board, field test), but people also jump between them. Progress persists in localStorage. Nothing computes until a button is pressed; nothing runs in the background.
+Used at a laptop in study sessions alongside the course's Unit 1 notebooks, and on a phone when shared. Steps are done in order (0–8, review board, field test), but people also jump between them. Progress persists in localStorage. Nothing computes until a button is pressed; nothing runs in the background.
 
 ## Constraints
 

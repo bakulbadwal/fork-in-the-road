@@ -369,6 +369,32 @@
     s += label(300, 364, "each stride: move the pin along its arrow, then ask for a new arrow (Euler)", null, { size: 15 });
     return wrap("s7", "The cartographer at her table with two arrow sheets. On the first, marked t equals 0, every small arrow on the map points at the cart in the centre. On the second, marked t equals 0.7, the arrows curve left and right around the cart. A poster on the wall reads arrows in use: pi zero, 10 Euler steps, cards of 50; GR00T N1, 4 steps, cards of 16. The courier waits at the right.", s);
   };
+  scenes.s8 = function () {
+    var s = '<rect x="0" y="300" width="960" height="100" fill="' + COBBLE + '" stroke="' + L + '" stroke-width="2"/>';
+    s += '<rect x="0" y="0" width="960" height="300" fill="' + PAPER + '"/><path d="M0 300 H960" stroke="' + L + '" stroke-width="2.5"/>';
+    // the cartographer's big desk, the apprentice's small one
+    s += table(300, 250, 300) + person(300, 300, { shirt: GRASS, apron: true, hat: "visor", skin: SKIN2 });
+    s += mapSheet(180, 160, 110, 84, { solid: true, w: 3 });
+    s += table(640, 262, 200) + person(640, 300, { shirt: LILAC, apron: true, hat: "cap", hatCol: YEL, skin: SKIN, hair: WOOD });
+    s += mapSheet(560, 178, 100, 78, { fog: 0.35, noise: 0.6, w: 2.5 });
+    // her practice sheets: a thin stack and a thick one
+    s += sheetStack(750, 236, 2, NOTE) + txt(775, 210, "1 drive", { size: 13, anchor: "middle" });
+    s += sheetStack(840, 236, 8, NOTE) + txt(870, 190, "49 drives", { size: 13, anchor: "middle" });
+    // the loss chalkboard on the wall
+    s += '<rect x="380" y="30" width="230" height="130" rx="6" fill="' + WOOD + '" stroke="' + L + '" stroke-width="2.5"/><rect x="388" y="38" width="214" height="114" fill="' + CHALK + '" stroke="' + L + '" stroke-width="1.5"/>';
+    s += '<path d="M400 138 H590" stroke="#CFE2C4" stroke-width="1.5"/><path d="M400 138 V48" stroke="#CFE2C4" stroke-width="1.5"/>';
+    s += '<path d="M402 52 C430 120, 470 118, 500 116 S560 114, 586 114" fill="none" stroke="#FFFDF6" stroke-width="2.5"/><path d="M400 112 H590" stroke="#BFE3A6" stroke-width="1.5" stroke-dasharray="5 4"/>';
+    s += txt(495, 150, "loss, step by step", { size: 12, fill: "#E9F1E4", anchor: "middle" }) + txt(560, 108, "the floor", { size: 11, fill: "#BFE3A6", anchor: "middle" });
+    s += board(300, 8, 360, "THE APPRENTICE", LILAC);
+    s += label(40, 130, "the cartographer = the exact best guess", null, { size: 15 });
+    s += label(40, 154, "(what a perfect network converges to)", null, { size: 14 });
+    s += label(40, 200, "the apprentice = a real network, 1,474 weights,", null, { size: 15 });
+    s += label(40, 224, "trained on the log with notebook 01's loop", null, { size: 15 });
+    s += label(40, 248, "her loss can only fall to the floor", null, { size: 15, fill: BAD });
+    s += label(320, 340, "give her a few hundred steps and pins blur into the cart", null, { size: 15 });
+    s += label(320, 364, "give her one drive in fifty on a side, and that side comes and goes", null, { size: 15 });
+    return wrap("s8", "The cartographer at her big desk with a clean route sheet beside an apprentice at a smaller desk with a half-fogged sheet; on the apprentice's desk a thin stack of practice sheets labelled one drive and a thick one labelled forty-nine drives. A chalkboard on the wall shows a loss curve falling toward a dashed line marked the floor.", s);
+  };
   scenes.cap = function () {
     var s = '<rect x="-5" y="268" width="970" height="100" fill="' + LILAC + '"/><rect x="-5" y="263" width="970" height="7" fill="' + WOOD + '" stroke="' + L + '" stroke-width="2"/><rect x="-5" y="364" width="970" height="40" fill="' + WOOD + '" stroke="' + L + '" stroke-width="3"/>';
     s += '<rect x="34" y="48" width="892" height="180" rx="6" fill="' + WOOD + '" stroke="' + L + '" stroke-width="2.5"/><rect x="44" y="58" width="872" height="160" fill="' + SAND + '" stroke="' + L + '" stroke-width="1.5"/>';
@@ -419,6 +445,7 @@
     tower: ic('<rect x="9" y="9" width="6" height="12" fill="' + WOOD + '"' + st + '/><rect x="6" y="6" width="12" height="4" fill="' + SAND + '"' + st + '/><path d="M5 6 l7 -4 7 4z" fill="' + BRICK + '"' + st + "/>"),
     carto: ic('<circle cx="12" cy="7" r="3.5" fill="' + SKIN2 + '"' + st + '/><rect x="6" y="11" width="12" height="9" rx="3" fill="' + GRASS + '"' + st + '/><path d="M8 4 h8" ' + st + "/>"),
     pin: ic('<circle cx="12" cy="9" r="5" fill="' + YEL + '"' + st + '/><path d="M12 14 v7" ' + st + "/>"),
+    apprentice: ic('<rect x="3" y="4" width="18" height="13" rx="2" fill="' + CHALK + '"' + st + '/><path d="M6 14 C9 8, 12 8, 18 7.5" ' + st + ' stroke="' + SHEET + '"/><path d="M5 20 h14" ' + st + ' stroke="' + WOOD + '" stroke-width="2.4"/>'),
     arrow: ic('<path d="M4 18 L18 6" ' + st + ' stroke="' + LEFT + '" stroke-width="2.4"/><path d="M12 5 h7 v7" ' + st + ' stroke="' + LEFT + '" stroke-width="2.4"/><circle cx="5" cy="19" r="2.2" fill="' + YEL + '"' + st + "/>"),
     joystick: ic('<rect x="3" y="15" width="18" height="6" rx="2" fill="' + STEEL + '"' + st + '/><path d="M12 15 l2 -8" ' + st + '/><circle cx="14.5" cy="5.5" r="2.8" fill="' + BRICK + '"' + st + '/><circle cx="7" cy="18" r="1.3" fill="' + YEL + '"' + st + "/>")
   };

@@ -75,6 +75,26 @@ console.log("drive with flow cards:");
 var fbase = { policy: "flow", K: 10, Ta: 8, lookout: true, msPerPass: 10, sch: cos, cartAt: S.still(0), seed: 3 };
 [1, 2, 5, 10].forEach(function (K) { var r = S.fleet(Object.assign({}, fbase, { K: K }), 20); console.log(" flow K=" + K + ": hits " + r.hits + "/20 · flips " + f(r.flips, 2) + " · time " + f(r.time, 1) + " s"); });
 
+console.log("\n== G. the apprentice (a real network; about 45 s) ==");
+var N = require("../js/net.js"), net0 = N.create(32, 1), gc = N.gradCheck(net0, { demos: [[0.5, 0.2]], sch: cos });
+console.log("weights " + net0.params + " · gradient check: analytic " + gc.analytic.toExponential(4) + " vs finite difference " + gc.numeric.toExponential(4));
+console.log("loss floor (exact denoiser, 20,000 pairs): " + f(N.floor(comps, S.BASIS2, cos, 20000, 5), 3));
+var exG = S.run2d({ K: 10, eta: 0, sch: cos, fx: 0 }), exF = S.fidelity(exG.chains.map(function (c) { return c.x; }), comps);
+console.log("exact K=10: cart " + exG.tally.cart + " · left " + exG.tally.left + " · route distance " + f(exF.onroute, 2));
+function apprentice(nLeft, steps) {
+  var demos = S.demosSplit(50, nLeft, 7, 0).map(function (p) { return [p.x0, p.y0]; }), n = N.create(32, 1);
+  var ema = N.train(n, { demos: demos, sch: cos, seed: 7 }, steps);
+  function lift(K) { var r = FR.sample({ K: K, eta: 0, sch: cos, D: 2, n: 600, seed: 11, predict: function (x, t, ab) { return { x0: N.predictX0(n, x, t, ab) }; } }); var p = r.map(function (c) { return c.x; }); return { t: S.tally(p, 0, comps), fi: S.fidelity(p, comps) }; }
+  var k10 = lift(10), k1 = lift(1);
+  console.log(" " + nLeft + " left of 50 · " + steps + " steps · loss " + f(ema, 3) + " → K=10: cart " + k10.t.cart + " · left " + k10.t.left + " (" + Math.round(100 * k10.t.left / 600) + "%) · route distance " + f(k10.fi.onroute, 2) + " · left blobs " + k10.fi.leftBlobs + "/6 · clipped " + k10.fi.offmap + " | K=1: clipped " + k1.fi.offmap + "/600");
+}
+[300, 3000, 10000].forEach(function (st) { apprentice(25, st); });
+[10, 5, 1].forEach(function (nl) { apprentice(nl, 10000); });
+apprentice(1, 30000);
+var pc10 = S.map2d(0); pc10.forEach(function (k) { k.lp = Math.log((k.side < 0 ? 0.1 : 0.9) / 6); });
+var ex10 = S.tally(FR.sample({ K: 10, eta: 0, sch: cos, D: 2, n: 600, seed: 11, comps: pc10, basis: S.BASIS2 }).map(function (c) { return c.x; }), 0, pc10);
+console.log(" exact cartographer with a 10% left prior: left " + ex10.left + " (" + Math.round(100 * ex10.left / 600) + "%)");
+
 console.log("\n== D. the lookout (conditioning) ==");
 [0.4, 0.7, 1.0].forEach(function (fx) {
   var seen = S.run2d({ K: 10, eta: 0, sch: cos, fx: fx, fxSeen: fx }), blind = S.run2d({ K: 10, eta: 0, sch: cos, fx: fx, fxSeen: 0 });

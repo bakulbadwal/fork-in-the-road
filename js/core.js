@@ -111,15 +111,16 @@
     return x0.map(function (v, i) { return aS * v + dir * eps[i] + (sig > 0 ? sig * normal() : 0); });
   }
   // Run n chains from pure noise through K passes. Returns each chain's final point, its trail and the denoiser's clean guess at every pass.
+  // o.predict(x, t, ab) → { x0 } swaps in another denoiser (a trained network); the default is the exact one.
   function sample(o) {
-    var ts = timesteps(o.K), r = rng(o.seed == null ? 1 : o.seed), out = [], D = o.D;
+    var ts = o.ts || timesteps(o.K), r = rng(o.seed == null ? 1 : o.seed), out = [], D = o.D;
     for (var n = 0; n < o.n; n++) {
       var x = []; for (var i = 0; i < D; i++) x.push(r.normal());
       var trail = [x.slice()], guesses = [], weights = [];
       for (var s = 0; s < ts.length; s++) {
         var t = ts[s], next = s + 1 < ts.length ? ts[s + 1] : -1;
         var abT = abAt(o.sch, t), abS = next < 0 ? null : abAt(o.sch, next);
-        var d = denoise(x, abT, o.comps, o.basis);
+        var d = o.predict ? o.predict(x, t, abT) : denoise(x, abT, o.comps, o.basis);
         var eps = epsFrom(x, d.x0, abT);
         x = ddimStep(x, d.x0, eps, abT, abS, o.eta, r.normal);
         trail.push(x.slice()); guesses.push(d.x0); weights.push(d.w);

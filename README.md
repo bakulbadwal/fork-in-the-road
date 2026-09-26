@@ -20,8 +20,9 @@ A delivery robot learns from a hundred human drives around a pretzel cart. Half 
 | **5 · The Lookout** | Park the cart anywhere; draw 600 pins with the report and 600 blindfolded, side by side | Conditioning: with the observation the pins go around today's cart; without it, around where it used to be, and 28% land in it at +1.0. FiLM vs Unit 2's channel concatenation |
 | **6 · Pin 16, Drive 8** | The courier drives: the cartographer (DDIM, or flow-matching arrows) or the clerk, 1–50 passes, 1–16 pins per card, lookout on or off, a vendor who pushes the cart mid-drive; 20-drive fleets with dents, side flips and time | Receding-horizon control on a diffusion sampler. Re-plan every pin and it dithers (1.9 flips a drive); drive 8 and it commits; drive all 16 and it can't react; blindfold it and half the drives dent |
 | **7 · Arrows** | The flow-matching velocity field over the square at any t; the same 600 fog points lifted by DDIM and by flow matching side by side, with thirty paths traced; a ladder for both with a same-side count | Flow matching trains an arrow (the straight-line velocity from fog to pin) instead of a guess. At t = 0 every arrow points at the cart, so one stride is the clerk again. With the exact field it is the same path as DDIM in different coordinates: the same fog reaches the same pin (600 of 600 at 50 strides), and the few-stride ladders differ by a few pins (8% vs 11% at three). The "straight path" is per training pair; the learned field bends at the fork, for both. What π0 (10 Euler steps) and GR00T N1 (4 steps) actually run |
+| **8 · The Apprentice** | Train a real network (a 1,474-weight MLP, hand-written backprop, seeded) on the dispatcher's log with the notebook's own loop, with a live loss curve against the exact cartographer's floor; lift the same fog with her and with the exact cartographer; a four-way split study on rare sides | Every earlier step used the perfect denoiser; this one shows what a learned one gets wrong. 300 steps: 32 pins in the cart in a blur. One pass from pure fog: all 600 fly to the map's edge, which is why samplers clip. A side that appears in 1 drive of 50 is drawn 4% of the time after 10,000 steps and 1% after 30,000, with its blobs dropping out. The exact cartographer is the ceiling; the apprentice is what you'd deploy |
 | **★ Review Board** | Three incident reports: the straight-liner, the ditherer, the slowpoke. Run the rule, pick a fix, re-drive 20 times, name the cause | The tempting wrong fixes (more data, more passes, a shorter card, a faster motor) fail for the reason the step taught |
-| **✓ Field Test** | Nine questions answered by operating the widgets | Proof it stuck |
+| **✓ Field Test** | Ten questions answered by operating the widgets | Proof it stuck |
 
 Each step has predict-then-reveal questions and a "say it out loud" line that unlocks once you've played. Every term has a tooltip with its plain meaning and its square equivalent. Progress is saved in your browser.
 
@@ -34,14 +35,14 @@ The interactive diffusion explainers are about images or about the geometry, and
 | | **Fork in the Road** | [Cart-Pole Diffusion](https://github.com/tinmanlab/cartpole-diffusion) | [Diffusion Explorer](https://github.com/helblazer811/Diffusion-Explorer) | [Diffusion Explainer](https://poloclub.github.io/diffusion-explainer/) |
 |---|:-:|:-:|:-:|:-:|
 | The fork: multi-modal demonstrations against an MSE baseline, every step | ✓ | — (balancing is single-mode; no baseline) | draw any 2-D distribution; no policy baseline | — |
-| A real trained denoiser | — (the exact Bayes-optimal denoiser for the toy data; nothing is trained) | ✓ | ✓ trains in the browser | pretrained Stable Diffusion |
+| A real trained denoiser | ✓ in step 8, beside the exact Bayes-optimal one that every other step uses | ✓ | ✓ trains in the browser | pretrained Stable Diffusion |
 | Forward process with two schedules, live | ✓ | timestep slider | ✓ | timestep controller |
 | DDIM vs DDPM (η) and the schedule's effect on few-pass sampling | ✓ | DDIM only | flow matching vs score matching | — |
 | Flow matching against DDIM on the same fog, with a straightness measure and the π0 / GR00T N1 recipes | ✓ | — | ✓ trains both objectives | — |
 | Passes against a latency budget | ✓ | — | — | — |
 | Conditioning on an observation, with a blindfolded baseline | ✓ | ✓ same noise, different observation | — | text prompt |
 | Receding-horizon execution with re-planning and a moving obstacle | ✓ | ✓ 16 predict, 4 execute | — | — |
-| Guided lessons with predict-then-check, a capstone and a graded test | ✓ (19 predictions, 3 cases, 9 questions) | a 6-step guided cycle | — | — |
+| Guided lessons with predict-then-check, a capstone and a graded test | ✓ (22 predictions, 3 cases, 10 questions) | a 6-step guided cycle | — | — |
 | Tied to the Hugging Face course notebooks | ✓ | — | — | — |
 
 Cart-Pole Diffusion is the one to open next if you want to see a *learned* denoiser drive a plant in real time; Diffusion Explorer is the one for watching a real model train on a distribution you drew.
@@ -49,6 +50,8 @@ Cart-Pole Diffusion is the one to open next if you want to see a *learned* denoi
 ![Six hundred pins lifted from fog in ten passes, thirty of them with the sampler's path traced, with the ladder of passes against dents](docs/lift.png)
 
 ![The same fog lifted by DDIM and by flow matching, side by side, with the ladder of passes against dents and the count of fog points that end on the same side both ways](docs/arrows.png)
+
+![The same fog lifted by the exact cartographer and by the apprentice, a real network trained in the browser, with in-the-cart, left-share and route-distance readouts for each](docs/apprentice.png)
 
 ## Run it
 
@@ -60,7 +63,7 @@ Play it live at the link above, or open `index.html` in a browser. There's no bu
 - **Teaching models, labelled on the page:**
   - The square, the two demonstrated routes, and how the demonstrators' choice of side leans with the courier's position are hand-designed.
   - The courier teleports between checkpoints ten times a second and stands still while a card is drawn; the vendor's push and pacing are one-number toys.
-  - No network is trained here.
+  - One network is trained here, the apprentice in step 8: a 1,474-weight MLP with hand-written backprop, trained the notebook's way and seeded. What she draws is measured, not asserted; her gradient is checked against finite differences in `tests/check.js`.
 - **The directions are real; the courier isn't a real robot.** Nothing here predicts how a real Diffusion Policy run behaves.
 
 Every number the build was checked against is in [`ACCEPTANCE.md`](ACCEPTANCE.md), and `node tests/check.js` prints them. Every demo is seeded, so it's the same for everyone.
@@ -82,8 +85,10 @@ Every number the build was checked against is in [`ACCEPTANCE.md`](ACCEPTANCE.md
 | `js/core.js` | The math: pure functions, exposed as `window.FR` |
 | `js/sim.js` | The square, the demonstrations, the waypoint card and the drive loop: seeded, deterministic |
 | `js/app.js` | Wires controls to the math and draws the maps |
+| `js/net.js` | The apprentice: a small MLP with hand-written backprop and Adam, seeded |
 | `js/glossary.js` | Tooltip definitions |
-| `js/art.js` | The nine hand-built SVG scenes and the icons |
+| `docs/recap.md` | A one-page recap card to print before a sitting |
+| `js/art.js` | The ten hand-built SVG scenes and the icons |
 | `tests/check.js` | Prints every number in `ACCEPTANCE.md` (`node tests/check.js`) |
 | `PRODUCT.md`, `DESIGN.md` | Product brief and design notes |
 

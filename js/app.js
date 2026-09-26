@@ -26,7 +26,7 @@
   var COL = { left: "#246A9C", right: "#D9771E", cart: "#A5321F", fog: "#B9BDC2", ink: "#3A2418", line: "#4A2E1E" };
 
   /* ---------------- nav ---------------- */
-  var NAV_ICON = { s0: "square", s1: "fog", s2: "map", s3: "passes", s4: "watch", s5: "spyglass", s6: "card", s7: "arrow", cap: "star", ft: "pencil" };
+  var NAV_ICON = { s0: "square", s1: "fog", s2: "map", s3: "passes", s4: "watch", s5: "spyglass", s6: "card", s7: "arrow", s8: "apprentice", cap: "star", ft: "pencil" };
   var sections = qa("section");
   function buildNav() {
     var nav = $("nav"); nav.innerHTML = "";
@@ -602,6 +602,112 @@
     redraws.push(function () { if ($("s7").classList.contains("on")) { field(); if (!drawn) { drawn = true; ladder(); } if (last && !running) { frameOne(vd, last.d, last.K - 1, 1, true, "DDIM"); frameOne(vw, last.f, last.K - 1, 1, true, "flow matching"); } else if (!running) idle(); } });
   }
 
+  /* ================= STEP 8: the apprentice (a real network) ================= */
+  function initS8() {
+    var N = window.FRNet, comps = S.map2d(0), ve = SquareView("s8e"), va = SquareView("s8a");
+    var o = { nLeft: 25, steps: 3000, K: 10 }, net = null, trained = 0, target = 0, hist = [], running = false, floorV = null, lastPair = null, lastLift = null, exactCache = {};
+    function floorLoss() { if (floorV == null) floorV = N.floor(comps, S.BASIS2, SCH.cosine, 20000, 5); return floorV; }
+    function demos() { return S.demosSplit(50, o.nLeft, 7, 0).map(function (p) { return [p.x0, p.y0]; }); }
+    function fresh() { net = N.create(32, 1); trained = 0; hist = []; lastPair = null; lastLift = null; }
+    function tags(ema) {
+      $("s8w").textContent = fmt(net.params, 0); $("s8floor").textContent = floorLoss().toFixed(3);
+      $("s8l").textContent = ema == null ? "–" : ema.toFixed(3); $("s8l").className = "v " + (ema == null ? "" : ema < floorLoss() * 1.05 ? "good" : ema < 0.45 ? "warn" : "bad");
+      $("s8n").textContent = fmt(trained, 0) + (target ? " / " + fmt(target, 0) : "");
+    }
+    function mathbox(ema) {
+      if (!lastPair) { $("s8m").innerHTML = "press Train: one pair from the current batch appears here"; return; }
+      var p = lastPair;
+      $("s8m").innerHTML = "one pair, step " + fmt(trained, 0) + ": fog level t = <b>" + p.t + "</b> · foggy pin x<sub>t</sub> = (" + sgn(p.xt[0]) + ", " + sgn(p.xt[1]) + ") · the fog that was added ε = (" + sgn(p.eps[0]) + ", " + sgn(p.eps[1]) + ")<br>her guess ε̂ = (<b>" + sgn(p.pred[0]) + "</b>, <b>" + sgn(p.pred[1]) + "</b>) · squared error " + (((p.pred[0] - p.eps[0]) * (p.pred[0] - p.eps[0]) + (p.pred[1] - p.eps[1]) * (p.pred[1] - p.eps[1])) / 2).toFixed(3) + " · nudge all " + fmt(net.params, 0) + " weights a little toward it (Adam, lr 0.002)";
+    }
+    function drawLoss() {
+      var c = $("s8loss"), ctx = c.getContext("2d"), r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1, w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+      if (c.width !== Math.round(w * d) || c.height !== Math.round(h * d)) { c.width = Math.round(w * d); c.height = Math.round(h * d); }
+      ctx.setTransform(d, 0, 0, d, 0, 0); ctx.fillStyle = "#FFFDF6"; ctx.fillRect(0, 0, w, h);
+      var pad = { l: 40, r: 10, t: 10, b: 24 }, lo = 0.3, hi = 1.0, span = Math.max(target, trained, 1);
+      var px = function (s) { return pad.l + s / span * (w - pad.l - pad.r); }, py = function (v) { return pad.t + (1 - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * (h - pad.t - pad.b); };
+      ctx.strokeStyle = "#E7DCC4"; ctx.lineWidth = 1; [0.4, 0.6, 0.8, 1.0].forEach(function (v) { ctx.beginPath(); ctx.moveTo(pad.l, py(v)); ctx.lineTo(w - pad.r, py(v)); ctx.stroke(); });
+      ctx.fillStyle = "#6E5040"; ctx.font = "13px 'Patrick Hand', sans-serif"; ctx.textAlign = "right"; [0.4, 0.6, 0.8, 1.0].forEach(function (v) { ctx.fillText(v.toFixed(1), pad.l - 5, py(v) + 4); });
+      ctx.textAlign = "center"; ctx.fillText("training steps → " + fmt(span, 0), w / 2, h - 6);
+      ctx.strokeStyle = "#3B7422"; ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(pad.l, py(floorLoss())); ctx.lineTo(w - pad.r, py(floorLoss())); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = "#3B7422"; ctx.textAlign = "left"; ctx.fillText("the exact cartographer's floor " + floorLoss().toFixed(3), pad.l + 6, py(floorLoss()) - 5);
+      if (hist.length > 1) { ctx.strokeStyle = COL.left; ctx.lineWidth = 2.2; ctx.beginPath(); hist.forEach(function (p, i) { if (i) ctx.lineTo(px(p[0]), py(p[1])); else ctx.moveTo(px(p[0]), py(p[1])); }); ctx.stroke(); }
+    }
+    function train() {
+      if (running) return;
+      var r = FR.rng(7), d = demos(), ema = null; fresh(); target = o.steps; running = true; $("s8go").disabled = true; $("s8lift").disabled = true; $("s8study").disabled = true;
+      $("s8st").innerHTML = "training on " + o.nLeft + " left and " + (50 - o.nLeft) + " right drives…";
+      (function chunk() {
+        var t0 = performance.now();
+        while (trained < target && performance.now() - t0 < 12) {
+          var res = N.trainStep(net, { rng: r, demos: d, sch: SCH.cosine }); trained++;
+          ema = ema == null ? res.loss : 0.98 * ema + 0.02 * res.loss;
+          if (trained % 10 === 0 || trained === target) hist.push([trained, ema]);
+          if (res.last) lastPair = res.last;
+        }
+        drawLoss(); tags(ema); mathbox(ema);
+        if (trained < target) setTimeout(chunk, 0);
+        else { running = false; $("s8go").disabled = false; $("s8lift").disabled = false; $("s8study").disabled = false; $("s8st").innerHTML = "<b>" + fmt(trained, 0) + "</b> steps · loss " + ema.toFixed(3) + " (floor " + floorLoss().toFixed(3) + ") · now lift the fog"; touch("s8"); }
+      })();
+    }
+    function exactRun(K) { if (!exactCache[K]) exactCache[K] = S.run2d({ K: K, eta: 0, sch: SCH.cosine, fx: 0 }); return exactCache[K]; }
+    function appRun(K, theNet) {
+      var res = FR.sample({ K: K, eta: 0, sch: SCH.cosine, D: 2, n: 600, seed: 11, predict: function (x, t, ab) { return { x0: N.predictX0(theNet, x, t, ab) }; } });
+      var pts = res.map(function (c) { return c.x; });
+      return { chains: res, tally: S.tally(pts, 0, comps), fid: S.fidelity(pts, comps) };
+    }
+    function paint(view, run, label) {
+      view.render({ fx: 0, routes: true, pts: run.chains.map(function (c) { return { x: Math.max(-2.95, Math.min(2.95, c.x[0])), y: Math.max(-2.95, Math.min(2.95, c.x[1])), col: classCol(S.classify(c.x[0], c.x[1], 0, comps)) }; }), caption: label });
+    }
+    function idle() { ve.render({ fx: 0, routes: true, caption: "the exact cartographer" }); va.render({ fx: 0, routes: true, caption: "the apprentice: train her first" }); }
+    function lift() {
+      if (!net || !trained) { $("s8st").innerHTML = "train the apprentice first"; return; }
+      var ex = exactRun(o.K), ap = appRun(o.K, net); lastLift = { ex: ex, ap: ap, K: o.K };
+      paint(ve, ex, "the exact cartographer · " + o.K + " pass" + (o.K > 1 ? "es" : "")); paint(va, ap, "the apprentice · " + fmt(trained, 0) + " steps · " + o.K + " pass" + (o.K > 1 ? "es" : ""));
+      var exf = S.fidelity(ex.chains.map(function (c) { return c.x; }), comps);
+      $("s8ec").textContent = pct(ex.tally.cart / 600); $("s8ac").textContent = pct(ap.tally.cart / 600); $("s8ac").className = "v " + (ap.tally.cart <= 2 ? "good" : ap.tally.cart < 30 ? "warn" : "bad");
+      $("s8el").textContent = pct(ex.tally.left / 600); $("s8al").textContent = pct(ap.tally.left / 600);
+      $("s8er").textContent = exf.onroute.toFixed(2); $("s8ar").textContent = ap.fid.onroute.toFixed(2); $("s8ar").className = "v " + (ap.fid.onroute < 0.25 ? "good" : ap.fid.onroute < 0.5 ? "warn" : "bad");
+      $("s8off").textContent = ap.fid.offmap + " / 600"; $("s8off").className = "v " + (ap.fid.offmap ? "bad" : "good");
+      $("s8st").innerHTML = "<b>" + o.K + "</b> pass" + (o.K > 1 ? "es" : "") + " · exact " + ex.tally.cart + " of 600 in the cart · apprentice " + ap.tally.cart + (ap.fid.offmap ? " · <b>" + ap.fid.offmap + " pins clipped at the map's edge</b>" : "");
+      touch("s8");
+    }
+    // The split study: four apprentices, 10,000 steps each, on logs where 50%, 20%, 10% and 2% of the drives went left.
+    var SPLITS = [25, 10, 5, 1];
+    function priorComps(share) { var c = S.map2d(0); c.forEach(function (k) { k.lp = Math.log((k.side < 0 ? share : 1 - share) / 6); }); return c; }
+    function study() {
+      if (running) return; running = true; $("s8study").disabled = true; $("s8go").disabled = true; var rows = [], i = 0;
+      function one() {
+        var nLeft = SPLITS[i], d = S.demosSplit(50, nLeft, 7, 0).map(function (p) { return [p.x0, p.y0]; }), n2 = N.create(32, 1), r = FR.rng(7), done = 0, tot = 10000;
+        (function chunk() {
+          var t0 = performance.now(); while (done < tot && performance.now() - t0 < 12) { N.trainStep(n2, { rng: r, demos: d, sch: SCH.cosine }); done++; }
+          $("s8sst").innerHTML = "apprentice " + (i + 1) + " of 4 (" + (2 * nLeft) + "% of drives went left) · step " + fmt(done, 0) + " / 10,000";
+          if (done < tot) setTimeout(chunk, 0);
+          else {
+            var ap = appRun(10, n2), pc = priorComps(nLeft / 50), exs = FR.sample({ K: 10, eta: 0, sch: SCH.cosine, D: 2, n: 600, seed: 11, comps: pc, basis: S.BASIS2 });
+            var ext = S.tally(exs.map(function (c) { return c.x; }), 0, pc);
+            rows.push({ share: 2 * nLeft, exLeft: ext.left, apLeft: ap.tally.left, cart: ap.tally.cart, leftBlobs: ap.fid.leftBlobs });
+            renderStudy(rows); i++;
+            if (i < SPLITS.length) one(); else { running = false; $("s8study").disabled = false; $("s8go").disabled = false; $("s8sst").innerHTML = "done · 10 passes each · the exact column samples with the same share as its prior"; touch("s8"); }
+          }
+        })();
+      }
+      one();
+    }
+    function renderStudy(rows) {
+      $("s8lad").innerHTML = "<tr><th>drives that went left</th><th>exact cartographer · left pins</th><th>apprentice · left pins</th><th>left-route blobs she still draws</th><th>in the cart</th></tr>" + rows.map(function (r) {
+        return "<tr><td class=\"n\">" + r.share + "% (" + (r.share / 2) + " of 50)</td><td>" + pct(r.exLeft / 600) + " (" + r.exLeft + ")</td><td class=\"n\" style=\"color:" + (Math.abs(r.apLeft - r.exLeft) <= 30 ? "#3B7422" : "#8A6300") + "\">" + pct(r.apLeft / 600) + " (" + r.apLeft + ")</td><td>" + r.leftBlobs + " of 6</td><td class=\"n\" style=\"color:" + cartCol(r.cart) + "\">" + pct(r.cart / 600) + (r.cart && r.cart < 12 ? " (" + r.cart + ")" : "") + "</td></tr>";
+      }).join("");
+    }
+    $("s8left").addEventListener("input", function () { o.nLeft = +this.value; $("s8leftv").textContent = o.nLeft + " left · " + (50 - o.nLeft) + " right"; });
+    seg($("s8steps"), [{ v: 300, label: "300 · under a second" }, { v: 3000, label: "3,000 · a few seconds" }, { v: 10000, label: "10,000 · ~5 s" }, { v: 30000, label: "30,000 · ~15 s" }], o.steps, function (v) { o.steps = +v; });
+    seg($("s8k"), [1, 5, 10, 50].map(function (k) { return { v: k, label: String(k) }; }), o.K, function (v) { o.K = +v; });
+    $("s8go").onclick = train; $("s8lift").onclick = lift; $("s8study").onclick = study;
+    fresh(); tags(); mathbox(); idle();
+    var drawn = false;
+    redraws.push(function () { if ($("s8").classList.contains("on")) { drawLoss(); if (!drawn) { drawn = true; tags(); } if (lastLift && !running) { paint(ve, lastLift.ex, "the exact cartographer · " + lastLift.K + " passes"); paint(va, lastLift.ap, "the apprentice · " + fmt(trained, 0) + " steps · " + lastLift.K + " passes"); } else if (!running) idle(); } });
+    window.FRApprentice = { train: train, lift: lift, study: study, set: function (k, v) { o[k] = v; } };
+  }
+
   /* ================= REVIEW BOARD ================= */
   var CASES = [
     { id: "c1", title: "Case 1 · the straight-liner", brief: "<b>The report:</b> the courier dents the cart every single drive. The dispatch rule is the clerk's: fit the average of the route sheets and drive it. The cart is parked at 0.0, where it always is; the sheets are 50 left, 50 right.",
@@ -669,7 +775,8 @@
     { q: "10 ms per pass and a card of 4 pins: how many passes fit before drawing the card takes longer than driving it?", hint: "step 4", ans: 40, tol: 0 },
     { q: "Cart parked at +1.0, cartographer blindfolded, 10 passes: what percent inside the cart?", hint: "step 5, %", ans: 28, tol: 5 },
     { q: "The cartographer, 10 passes, lookout on, no push, cart at 0.0, re-planning after every pin (Ta = 1): side flips per drive over 20 drives?", hint: "step 6, Drive 20 in a row", ans: 1.9, tol: 0.5 },
-    { q: "Flow matching, 3 Euler steps from the same fog: what percent of the 600 pins end inside the cart?", hint: "step 7, %", ans: 8, tol: 2 }
+    { q: "Flow matching, 3 Euler steps from the same fog: what percent of the 600 pins end inside the cart?", hint: "step 7, %", ans: 8, tol: 2 },
+    { q: "The apprentice trained 300 steps on a 25/25 log, 10 passes: how many of the 600 pins end inside the cart?", hint: "step 8, a count", ans: 32, tol: 6 }
   ];
   function initFT() {
     $("ftqs").innerHTML = FT.map(function (f, i) { return '<div class="fq"><div class="fqt"><b>' + (i + 1) + ".</b> " + f.q + ' <span class="muted">(' + f.hint + ')</span></div><div class="row"><input type="number" id="ft' + i + '" step="any" value="' + (store.ft[i] != null ? esc(store.ft[i]) : "") + '"><span class="res" id="ftr' + i + '"></span></div></div>'; }).join("");
@@ -678,7 +785,7 @@
       FT.forEach(function (f, i) { var raw = $("ft" + i).value, v = parseFloat(raw), ok = raw !== "" && !isNaN(v) && Math.abs(v - f.ans) <= f.tol; store.ft[i] = raw; if (ok) score++; $("ftr" + i).innerHTML = ok ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>'; });
       save();
       $("ftscore").innerHTML = "<b>" + score + " / " + FT.length + "</b>" + (score === FT.length ? " · you can read the Diffusion Policy paper." : "");
-      if (score >= 7 && !store.said.ft) { store.said.ft = true; save(); buildNav(); markNav(); }
+      if (score >= 8 && !store.said.ft) { store.said.ft = true; save(); buildNav(); markNav(); }
     };
     $("reset").onclick = function () { try { localStorage.removeItem(KEY); } catch (e) {} history.replaceState(null, "", location.pathname); location.reload(); };
   }
@@ -701,9 +808,9 @@
   qa(".kmap .k[data-i]").forEach(function (el) { el.innerHTML = IC[el.dataset.i] || ""; });
   qa(".mast .mi").forEach(function (el) { el.innerHTML = IC.courier || ""; });
   buildNav(); buildNext();
-  function hashId() { var m = /^#\/?(s[0-7]|cap|ft)$/.exec(location.hash || ""); return m ? m[1] : null; }
+  function hashId() { var m = /^#\/?(s[0-8]|cap|ft)$/.exec(location.hash || ""); return m ? m[1] : null; }
   window.addEventListener("hashchange", function () { var id = hashId(); if (id && !$(id).classList.contains("on")) show(id); });
-  initS0(); initS1(); initS2(); initS3(); initS4(); initS5(); initS6(); initS7(); initCap(); initFT();
+  initS0(); initS1(); initS2(); initS3(); initS4(); initS5(); initS6(); initS7(); initS8(); initCap(); initFT();
   initTips(document); initPredicts();
   sections.forEach(function (s) { checkSay(s.id); });
   var start = hashId() || "s0";
@@ -716,6 +823,7 @@
       if (run === "lift" && start === "s3") $("s3go").click();
       if (run === "drive" && start === "s6") { $("s6push").checked = true; window.FRDrive.set("push", true); $("s6go").click(); }
       if (run === "both" && start === "s7") $("s7go").click();
+      if (run === "train" && start === "s8") { $("s8go").click(); var wait = setInterval(function () { if (!$("s8go").disabled) { clearInterval(wait); $("s8lift").click(); } }, 100); }
       // Screenshot mode only: settle at the top once fonts, clicks and layout are done (headless Chrome otherwise drifts).
       if (document.body.classList.contains("shot")) setTimeout(function () { window.scrollTo(0, 0); }, 700);
     }, 0);

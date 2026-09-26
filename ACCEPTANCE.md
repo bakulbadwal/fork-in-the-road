@@ -54,16 +54,32 @@ Numeric checks are asserted against `window.FR` (the exact math) and `window.FRS
 | F5 | Paper facts quoted on the page, read from the papers' full text on 2026-09-26 | π0: A^τ = τA + (1−τ)ε, target A − ε, τ ~ beta emphasising noisier timesteps, forward Euler with 10 steps (δ = 0.1), H = 50, up to 50 Hz, 300M-parameter expert on a 3.3B total · GR00T N1: A^τ = τA + (1−τ)ε, forward Euler, K = 4, H = 16, 63.9 ms on an L40 in bf16, 2.2B parameters. The GR00T paper prints the target as ε − A; its update rule (A ← A + V/K from noise at τ = 0) and its released code (`velocity = actions - noise`, `actions = actions + dt * pred_velocity` in `flow_matching_action_head.py`, n1-release) use A − ε, the same as π0 | ✓ |
 | F6 | **Same fog, same pin.** With the exact field, DDIM at η = 0 and flow matching's Euler integrate the same path in different coordinates (x_flow = x_DDIM ÷ (√ᾱ + √(1−ᾱ))) | K = 10: **599 of 600** fog points end on the same side both ways, largest gap between a point's two pins 0.094 · K = 50: **600 of 600**, gap 0.020 · DDIM's trails redrawn in flow's coordinates score 0.560 (K = 10) / 0.555 (K = 50) against flow's own 0.545 / 0.551. Found by the second adversarial review; the page's earlier "DDIM's paths are straighter, because the fork bends the flow field" was a coordinate artifact and was replaced | ✓ |
 
+## G. The apprentice (step 8): a real network, trained in the browser
+
+`js/net.js`: an MLP (10 inputs: x, y and a sine/cosine encoding of t at four frequencies; two hidden layers of 32, SiLU; 2 outputs), hand-written backprop, Adam at lr 0.002, batches of 64, weights seeded. Trained with notebook 01's loop on the dispatcher's log (50 drives, six positions each), cosine schedule. Her clean guess is clipped to |x| ≤ 3 (diffusers' `clip_sample`). All rows: seed 11 fog, 600 pins, verified in Node and Chrome (both V8).
+
+| # | Check | Expected | Result |
+|---|---|---|---|
+| G1 | Gradient check (one weight, finite differences, h = 10⁻⁶) | analytic 1.4801 × 10⁻² = numeric 1.4801 × 10⁻² · 1,474 weights | ✓ |
+| G2 | The loss floor: the exact denoiser's mean squared error on the fog, 20,000 pairs | **0.356** | ✓ |
+| G3 | 25/25 log, 10 passes, by training steps | 300: **32** in the cart, route distance **0.44**, loss 0.479 · 3,000: **15**, 0.21 · 10,000: **0**, 0.18, 50% left, loss 0.368 (exact: 1, 0.14, 51%) | ✓ |
+| G4 | One pass from pure fog, any training | **600 of 600** pins caught by the clip (√ᾱ₉₉₉ ≈ 4.9 × 10⁻⁵ multiplies any error in ε̂ by about 20,000); the exact cartographer's one pass is the tidy average | ✓ |
+| G5 | The split, 10,000 steps: drives that went left → apprentice's left share | 25 of 50 (50%) → **50%** · 10 (20%) → **27%** · 5 (10%) → **21%**, 5 of 6 left blobs · 1 (2%) → **4%**, 2 of 6 left blobs, 9 in the cart | ✓ |
+| G6 | 1 of 50 left, 30,000 steps | **1%** (7 of 600), 0 of 6 left blobs with five pins | ✓ |
+| G7 | The exact cartographer sampling with a 10% left prior | 8% (50 of 600): she reproduces a share; the apprentice over-draws it at 21% | ✓ |
+| G8 | Seed sensitivity, 25/25 at 10,000 steps (study script, seeds 2 and 3) | 47% and 47% left; 0 in the cart | ✓ |
+
 ## C. It teaches
 
 - C1 Every step is interactive, with live visuals; nothing computes until a control is touched.
-- C2 Every step 0–7 has at least one predict-then-reveal question (19 in all), and every number in an answer key appears in A, B or F.
+- C2 Every step 0–8 has at least one predict-then-reveal question (22 in all), and every number in an answer key appears in A, B, F or G.
 - C3 Every step ends with a "say it out loud" line that unlocks after the predictions and three interactions.
 - C4 Every wavy-underlined term has a tooltip with its plain meaning and its square equivalent; ᾱ, x̂₀, Ta, latency and flow matching are wired up.
 - C5 Every step names the course notebook section or the Diffusion Policy section it covers.
 - C6 The honesty note is on the page and in the README, and names the timestep spacing correctly ("trailing").
 - C7 Review board: three cases, each with a fleet re-drive scored on the behaviour *and* a named cause; known-good fixes pass, known-bad fixes fail for the stated reason (B17–B19). A star, once earned, is kept.
-- C8 Field test: nine questions answered by operating the widgets, graded automatically with tolerances (9/9 on the right answers; seven or more earns the check). Every question states the settings it needs.
+- C8 Field test: ten questions answered by operating the widgets, graded automatically with tolerances (10/10 on the right answers; eight or more earns the check). Every question states the settings it needs.
+- C13 Step 8 trains in chunks of about 12 ms on a timer (not animation frames), so the page stays responsive and a background tab still finishes; the Train, Lift and Study buttons disable while a run is in progress and re-enable when it ends. The honesty note now says one network is trained, and what it gets wrong is on the page.
 - C11 The map canvases are drawn in the scenes' language: cobbled paving, storefronts down both sides, a tree and a bench, the depot and the bakery, the cart with its striped awning and sign, the courier with its crate and antenna, and fog banks whose opacity follows √(1−ᾱ) on step 1 (half of it on step 2, so the guesses stay readable), the sampler's actual √(1−ᾱ) at each pass on step 3 and on step 7's DDIM map, and 1 − t on step 7's flow map.
 - C12 A second fresh-context review of step 7 confirmed the flow-matching math (posterior, velocity, Euler, straightness) and the paper numbers, and found the step's original conclusion wrong (F6). Fixed: the s7c answer key, the say-it line, the README and this file.
 - C9 The fog-lift and drive animations are time-based; under `prefers-reduced-motion` or `?instant=1` they jump straight to the end, and the buttons re-enable.

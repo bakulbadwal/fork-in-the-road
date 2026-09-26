@@ -48,6 +48,22 @@
     }
     return pts;
   }
+  // The dispatcher's log with a chosen split: the first nLeft drives went left, the rest right (six positions each).
+  function demosSplit(nDrives, nLeft, seed, fx) {
+    var r = FR.rng(seed), pts = [];
+    for (var d = 0; d < nDrives; d++) {
+      var s = d < nLeft ? -1 : 1;
+      LEVELS.forEach(function (y) { pts.push({ x0: routeX(y, s, fx || 0) + SIG * r.normal(), y0: y + SIG * r.normal(), side: s, drive: d }); });
+    }
+    return pts;
+  }
+  // Route fidelity for a set of pins: mean distance to the nearest demonstrated route blob, and how many of the 12 blobs got pins.
+  function fidelity(pts, comps) {
+    var on = 0, cover = new Array(comps.length).fill(0), off = 0, lb = 0, rb = 0;
+    pts.forEach(function (p) { var b = Infinity, bi = 0; comps.forEach(function (c, k) { var q = Math.hypot(p[0] - c.mu[0], p[1] - c.mu[1]); if (q < b) { b = q; bi = k; } }); on += b; cover[bi]++; if (Math.abs(p[0]) > 2.8 || Math.abs(p[1]) > 2.8) off++; });
+    comps.forEach(function (c, k) { if (cover[k] >= 5) { if (c.side < 0) lb++; else rb++; } });
+    return { onroute: pts.length ? on / pts.length : 0, blobs: lb + rb, leftBlobs: lb, rightBlobs: rb, offmap: off };
+  }
   // Run the sampler on the 2-D map. The denoiser believes the cart is at fxSeen; the tally uses where it really is (fx).
   // o.flow = true runs flow matching (Euler, K steps) instead of DDIM, from the same seeded fog.
   function run2d(o) {
@@ -138,7 +154,7 @@
   var pacing = function (amp, period) { return function (t) { return amp * Math.sin(2 * Math.PI * t / period); }; };
 
   var S = { START_Y: START_Y, GOAL_Y: GOAL_Y, VIEW: VIEW, CART: CART, A: A, bump: bump, routeX: routeX, inCart: inCart, sideOf: sideOf, classify: classify, tally: tally,
-    LEVELS: LEVELS, SIG: SIG, BASIS2: BASIS2, map2d: map2d, demos2d: demos2d, run2d: run2d,
+    LEVELS: LEVELS, SIG: SIG, BASIS2: BASIS2, map2d: map2d, demos2d: demos2d, demosSplit: demosSplit, fidelity: fidelity, run2d: run2d,
     H: H, DY: DY, KAPPA: KAPPA, LAM: LAM, BASIS16: BASIS16, chunkMean: chunkMean, chunkComps: chunkComps, chunkYs: chunkYs, DT_WP: DT_WP,
     drive: drive, fleet: fleet, still: still, pushed: pushed, pacing: pacing };
   if (typeof module !== "undefined" && module.exports) module.exports = S; else root.FRSim = S;

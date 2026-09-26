@@ -40,7 +40,10 @@ nav button .ic{display:inline-block;width:20px;height:20px;vertical-align:-4px;m
 nav button .ic svg,.kmap .k svg{width:100%;height:100%;display:block}
 nav button .chk{color:var(--grass-d);margin-left:4px;font-weight:700}
 nav button:nth-child(1){--c:var(--yellow)}nav button:nth-child(2){--c:#D9E4EC}nav button:nth-child(3){--c:#9BCB7E}nav button:nth-child(4){--c:var(--sky)}
-nav button:nth-child(5){--c:var(--lilac)}nav button:nth-child(6){--c:var(--sand)}nav button:nth-child(7){--c:#F2A88F}nav button:nth-child(8){--c:#F9D95B}nav button:nth-child(9){--c:#B7DD9C}nav button:nth-child(10){--c:#E5C9F2}
+nav button:nth-child(5){--c:var(--lilac)}nav button:nth-child(6){--c:var(--sand)}nav button:nth-child(7){--c:#F2A88F}nav button:nth-child(8){--c:#F9D95B}nav button:nth-child(9){--c:#D9E4EC}nav button:nth-child(10){--c:#B7DD9C}nav button:nth-child(11){--c:#E5C9F2}
+canvas.chart2{aspect-ratio:2.6/1;height:auto}
+.series{font:400 14px/1.4 var(--hand);color:var(--soft);text-align:center;margin:18px 0 6px}
+.series a{color:var(--sky-d)}
 nav button:focus-visible{outline:3px solid var(--sky-d);outline-offset:2px}
 
 section{display:none}
