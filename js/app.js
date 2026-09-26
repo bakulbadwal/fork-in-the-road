@@ -710,7 +710,7 @@
     }
     function cartCls(n) { return n <= 2 ? "good" : n < 30 ? "warn" : "bad"; }
     // The split study: four apprentices, 10,000 steps each, on logs where 50%, 20%, 10% and 2% of the drives went left; the exact cartographer
-    // samples with the same share as her prior; both are compared with the binomial spread of 600 pins at that share.
+    // samples with the same share as her prior, through the same sampler and the same fog, and her count is the reference.
     var SPLITS = [25, 10, 5, 1];
     function study() {
       if (running) return; setBusy(true); var rows = [], i = 0;
@@ -722,8 +722,8 @@
             var t0 = performance.now(); while (done < tot && performance.now() - t0 < 12) { N.trainStep(n2, { rng: r, demos: d, sch: SCH.cosine }); done++; }
             $("s8sst").innerHTML = "apprentice " + (i + 1) + " of 4 (" + (2 * nLeft) + "% of drives went left) · step " + fmt(done, 0) + " / 10,000";
             if (done < tot) { setTimeout(chunk, 0); return; }
-            var ap = appRun(10, n2), ex = exactRun(10, nLeft), share = nLeft / 50;
-            rows.push({ share: 2 * nLeft, nLeft: nLeft, exLeft: ex.tally.left, apLeft: ap.tally.left, cart: ap.tally.cart, mean: 600 * share, sd: Math.sqrt(600 * share * (1 - share)) });
+            var ap = appRun(10, n2), ex = exactRun(10, nLeft);
+            rows.push({ share: 2 * nLeft, nLeft: nLeft, exLeft: ex.tally.left, apLeft: ap.tally.left, cart: ap.tally.cart });
             renderStudy(rows); i++;
             if (i < SPLITS.length) { one(); return; }
             finish("done · 10 passes each from t = 899, the same 600 fog points for both · training seed 7; ten seeds are in ACCEPTANCE.md, G5 · green: within two SD of the cartographer's count");
@@ -733,11 +733,11 @@
       one();
     }
     // The reference is the exact cartographer's count through the same sampler and the same fog (not 600 × share: the centred start at
-    // t = 899 nudges a rare side up for both of them). Green: the apprentice is within two binomial SD of that count.
+    // t = 899 pushes a rare side up for both of them). Green: the apprentice is within two binomial SD of that count.
     function renderStudy(rows) {
       $("s8lad").innerHTML = "<tr><th>drives that went left</th><th>exact cartographer, same share as prior, same fog</th><th>apprentice, 10,000 steps</th><th>apprentice − cartographer</th><th>apprentice · in the cart</th></tr>" + rows.map(function (r) {
         var p = r.exLeft / 600, sd = Math.sqrt(600 * p * (1 - p)), diff = r.apLeft - r.exLeft, col = Math.abs(diff) <= 2 * sd ? "#3B7422" : "#8A6300";
-        return "<tr><td class=\"n\">" + r.share + "% (" + r.nLeft + " of 50)</td><td>" + pct(r.exLeft / 600) + " (" + r.exLeft + ")</td><td class=\"n\" style=\"color:" + col + "\">" + pct(r.apLeft / 600) + " (" + r.apLeft + ")</td><td style=\"color:" + col + "\">" + (diff > 0 ? "+" : "") + diff + " (± " + Math.round(2 * sd) + " is noise)</td><td class=\"n\" style=\"color:" + cartCol(r.cart) + "\">" + r.cart + " of 600</td></tr>";
+        return "<tr><td class=\"n\">" + r.share + "% (" + r.nLeft + " of 50)</td><td>" + pct(r.exLeft / 600) + " (" + r.exLeft + ")</td><td class=\"n\" style=\"color:" + col + "\">" + pct(r.apLeft / 600) + " (" + r.apLeft + ")</td><td style=\"color:" + col + "\">" + (diff > 0 ? "+" : "") + diff + " (a fresh fog draw alone moves a count by ± " + Math.round(2 * sd) + ")</td><td class=\"n\" style=\"color:" + cartCol(r.cart) + "\">" + r.cart + " of 600</td></tr>";
       }).join("");
     }
     $("s8left").addEventListener("input", function () { o.nLeft = +this.value; $("s8leftv").textContent = o.nLeft + " left · " + (50 - o.nLeft) + " right"; if (net && trained && !running && o.nLeft !== trainedOn) $("s8st").innerHTML = "she was trained on " + trainedOn + " left · press Train to teach her this log"; });
