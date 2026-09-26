@@ -75,25 +75,37 @@ console.log("drive with flow cards:");
 var fbase = { policy: "flow", K: 10, Ta: 8, lookout: true, msPerPass: 10, sch: cos, cartAt: S.still(0), seed: 3 };
 [1, 2, 5, 10].forEach(function (K) { var r = S.fleet(Object.assign({}, fbase, { K: K }), 20); console.log(" flow K=" + K + ": hits " + r.hits + "/20 · flips " + f(r.flips, 2) + " · time " + f(r.time, 1) + " s"); });
 
-console.log("\n== G. the apprentice (a real network; about 45 s) ==");
+console.log("\n== G. the apprentice (a real network; about 60 s) ==");
 var N = require("../js/net.js"), net0 = N.create(32, 1), gc = N.gradCheck(net0, { demos: [[0.5, 0.2]], sch: cos });
-console.log("weights " + net0.params + " · gradient check: analytic " + gc.analytic.toExponential(4) + " vs finite difference " + gc.numeric.toExponential(4));
-console.log("loss floor (exact denoiser, 20,000 pairs): " + f(N.floor(comps, S.BASIS2, cos, 20000, 5), 3));
-var exG = S.run2d({ K: 10, eta: 0, sch: cos, fx: 0 }), exF = S.fidelity(exG.chains.map(function (c) { return c.x; }), comps);
-console.log("exact K=10: cart " + exG.tally.cart + " · left " + exG.tally.left + " · route distance " + f(exF.onroute, 2));
-function apprentice(nLeft, steps) {
-  var demos = S.demosSplit(50, nLeft, 7, 0).map(function (p) { return [p.x0, p.y0]; }), n = N.create(32, 1);
-  var ema = N.train(n, { demos: demos, sch: cos, seed: 7 }, steps);
-  function lift(K) { var r = FR.sample({ K: K, eta: 0, sch: cos, D: 2, n: 600, seed: 11, predict: function (x, t, ab) { return { x0: N.predictX0(n, x, t, ab) }; } }); var p = r.map(function (c) { return c.x; }); return { t: S.tally(p, 0, comps), fi: S.fidelity(p, comps) }; }
-  var k10 = lift(10), k1 = lift(1);
-  console.log(" " + nLeft + " left of 50 · " + steps + " steps · loss " + f(ema, 3) + " → K=10: cart " + k10.t.cart + " · left " + k10.t.left + " (" + Math.round(100 * k10.t.left / 600) + "%) · route distance " + f(k10.fi.onroute, 2) + " · left blobs " + k10.fi.leftBlobs + "/6 · clipped " + k10.fi.offmap + " | K=1: clipped " + k1.fi.offmap + "/600");
+console.log("weights " + net0.params + " · gradient check (one weight): analytic " + gc.analytic.toExponential(4) + " vs finite difference " + gc.numeric.toExponential(4));
+var d25 = S.demosSplit(50, 25, 7, 0).map(function (p) { return [p.x0, p.y0]; }), tc = N.trainCheck(N.create(32, 1), { demos: d25, sch: cos });
+console.log("training-step check: worst relative error " + tc.worstRelativeError.toExponential(1) + " over " + tc.checked + " weights and biases (the gradient Adam sees on a seeded batch vs finite differences)");
+var TM = 899;
+console.log("both samplers start at t = " + TM + ": sqrt(abar) there is " + f(Math.sqrt(FR.abAt(cos, TM)), 3) + " (a learned error is multiplied by " + f(1 / Math.sqrt(FR.abAt(cos, TM)), 1) + "); at t = 999 it is " + Math.sqrt(FR.abAt(cos, 999)).toExponential(1) + " (multiplied by " + Math.round(1 / Math.sqrt(FR.abAt(cos, 999))).toLocaleString("en-US") + ")");
+function priorG(share) { var c = S.map2d(0); c.forEach(function (k) { k.lp = Math.log((k.side < 0 ? share : 1 - share) / 6); }); return c; }
+function exactG(K, nLeft) { var r = FR.sample({ K: K, ts: FR.timestepsFrom(K, TM), eta: 0, sch: cos, D: 2, n: 600, seed: 11, comps: priorG(nLeft / 50), basis: S.BASIS2 }); var p = r.map(function (c) { return c.x; }); return { t: S.tally(p, 0, comps), fi: S.fidelity(p, comps) }; }
+[1, 10, 50].forEach(function (K) { var e = exactG(K, 25); console.log("exact 50/50 from " + TM + ", K=" + K + ": cart " + e.t.cart + " · left " + e.t.left + " · route distance " + f(e.fi.onroute, 2)); });
+console.log("floors (the exact guess's loss, 20,000 pairs): true map with the log's share / the log's own 300 pins");
+[25, 10, 5, 1].forEach(function (nl) { var d = S.demosSplit(50, nl, 7, 0).map(function (p) { return [p.x0, p.y0]; }); console.log(" " + nl + " left of 50: " + f(N.floor(priorG(nl / 50), S.BASIS2, cos, 20000, 5), 3) + " / " + f(N.floorEmpirical(d, cos, 20000, 5), 3)); });
+var cacheG = {};
+function apprenticeG(nLeft, steps, seed) {
+  var key = nLeft + "/" + steps + "/" + seed; if (cacheG[key]) return cacheG[key];
+  var demos = S.demosSplit(50, nLeft, 7, 0).map(function (p) { return [p.x0, p.y0]; }), n = N.create(32, 1), ema = N.train(n, { demos: demos, sch: cos, seed: seed }, steps);
+  function lift(K) { var clips = 0, r = FR.sample({ K: K, ts: FR.timestepsFrom(K, TM), eta: 0, sch: cos, D: 2, n: 600, seed: 11, predict: function (x, t, ab) { var raw = N.predictX0(n, x, t, ab, 0), c = N.predictX0(n, x, t, ab); if (raw[0] !== c[0] || raw[1] !== c[1]) clips++; return { x0: c }; } }); var p = r.map(function (c) { return c.x; }); return { t: S.tally(p, 0, comps), fi: S.fidelity(p, comps), clips: clips }; }
+  return (cacheG[key] = { loss: ema, k1: lift(1), k10: lift(10), k50: lift(50) });
 }
-[300, 3000, 10000].forEach(function (st) { apprentice(25, st); });
-[10, 5, 1].forEach(function (nl) { apprentice(nl, 10000); });
-apprentice(1, 30000);
-var pc10 = S.map2d(0); pc10.forEach(function (k) { k.lp = Math.log((k.side < 0 ? 0.1 : 0.9) / 6); });
-var ex10 = S.tally(FR.sample({ K: 10, eta: 0, sch: cos, D: 2, n: 600, seed: 11, comps: pc10, basis: S.BASIS2 }).map(function (c) { return c.x; }), 0, pc10);
-console.log(" exact cartographer with a 10% left prior: left " + ex10.left + " (" + Math.round(100 * ex10.left / 600) + "%)");
+function j(rs, g) { return rs.map(g).join("/"); }
+console.log("25/25 log by training steps, seeds 7 / 8 / 9 (K=10 unless noted)");
+[300, 3000, 10000].forEach(function (st) {
+  var rs = [7, 8, 9].map(function (s) { return apprenticeG(25, st, s); });
+  console.log(" " + st + " steps: K=10 cart " + j(rs, function (r) { return r.k10.t.cart; }) + " · left " + j(rs, function (r) { return Math.round(100 * r.k10.t.left / 600) + "%"; }) + " · route distance " + j(rs, function (r) { return f(r.k10.fi.onroute, 2); }) + " · clipped guesses " + j(rs, function (r) { return r.k10.clips; }) + " of 6,000 · loss " + j(rs, function (r) { return f(r.loss, 3); }) + " | K=1 cart " + j(rs, function (r) { return r.k1.t.cart; }) + " (route " + j(rs, function (r) { return f(r.k1.fi.onroute, 2); }) + ", clipped " + j(rs, function (r) { return r.k1.clips; }) + ") | K=50 cart " + j(rs, function (r) { return r.k50.t.cart; }));
+});
+console.log("the split at 10,000 steps, seeds 7 / 8 / 9; the exact cartographer with the same share as prior; expected = 600 × share ± one SD");
+[[25, 0.5], [10, 0.2], [5, 0.1], [1, 0.02]].forEach(function (sp) {
+  var rs = [7, 8, 9].map(function (s) { return apprenticeG(sp[0], 10000, s); }), ex = exactG(10, sp[0]);
+  console.log(" " + sp[0] + " left (" + Math.round(100 * sp[1]) + "%): apprentice left " + j(rs, function (r) { return r.k10.t.left; }) + " · cart " + j(rs, function (r) { return r.k10.t.cart; }) + " · loss " + j(rs, function (r) { return f(r.loss, 3); }) + " · exact left " + ex.t.left + " · expected " + Math.round(600 * sp[1]) + " ± " + Math.round(Math.sqrt(600 * sp[1] * (1 - sp[1]))));
+});
+[[25, "25/25"], [1, "1/49"]].forEach(function (sp) { var r = apprenticeG(sp[0], 30000, 7); console.log(sp[1] + " log, 30,000 steps, seed 7: loss " + f(r.loss, 3) + " · K=10 cart " + r.k10.t.cart + " · left " + r.k10.t.left + " · route distance " + f(r.k10.fi.onroute, 2)); });
 
 console.log("\n== D. the lookout (conditioning) ==");
 [0.4, 0.7, 1.0].forEach(function (fx) {

@@ -387,12 +387,12 @@
     s += txt(495, 150, "loss, step by step", { size: 12, fill: "#E9F1E4", anchor: "middle" }) + txt(560, 108, "the floor", { size: 11, fill: "#BFE3A6", anchor: "middle" });
     s += board(300, 8, 360, "THE APPRENTICE", LILAC);
     s += label(40, 130, "the cartographer = the exact best guess", null, { size: 15 });
-    s += label(40, 154, "(what a perfect network converges to)", null, { size: 14 });
-    s += label(40, 200, "the apprentice = a real network, 1,474 weights,", null, { size: 15 });
-    s += label(40, 224, "trained on the log with notebook 01's loop", null, { size: 15 });
-    s += label(40, 248, "her loss can only fall to the floor", null, { size: 15, fill: BAD });
+    s += label(40, 154, "(what unlimited data and training converge to)", null, { size: 14 });
+    s += label(628, 66, "the apprentice = a real network, 1,474 weights,", null, { size: 14 });
+    s += label(628, 90, "trained on the log with notebook 01's loop", null, { size: 14 });
+    s += label(628, 114, "her loss falls toward the floor, never to zero", null, { size: 14, fill: BAD });
     s += label(320, 340, "give her a few hundred steps and pins blur into the cart", null, { size: 15 });
-    s += label(320, 364, "give her one drive in fifty on a side, and that side comes and goes", null, { size: 15 });
+    s += label(320, 364, "give her one drive in fifty on a side, and she draws it one time in fifty", null, { size: 15 });
     return wrap("s8", "The cartographer at her big desk with a clean route sheet beside an apprentice at a smaller desk with a half-fogged sheet; on the apprentice's desk a thin stack of practice sheets labelled one drive and a thick one labelled forty-nine drives. A chalkboard on the wall shows a loss curve falling toward a dashed line marked the floor.", s);
   };
   scenes.cap = function () {

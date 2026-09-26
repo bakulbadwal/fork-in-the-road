@@ -42,6 +42,9 @@
   // The K timesteps a K-pass sampler visits, most noisy first: 999, 999 − T/K, … (diffusers' "trailing" spacing;
   // its DDIMScheduler defaults to "leading", 900 … 0 for K = 10, which never starts a chain at t = 999).
   function timesteps(K) { var ts = []; for (var i = 0; i < K; i++) ts.push(Math.round((T - 1) - i * T / K)); return ts; }
+  // The same spacing but starting lower: K passes from tmax down. Step 8 starts both samplers at t = 899, because at
+  // t = 999 a learned network's clean guess is amplified 20,000× by the division by √ᾱ and is clipped every time.
+  function timestepsFrom(K, tmax) { var ts = []; for (var i = 0; i < K; i++) ts.push(Math.round(tmax - i * (tmax + 1) / K)); return ts; }
 
   /* ---------- the forward process ---------- */
   // x_t = √ᾱ_t · x_0 + √(1 − ᾱ_t) · ε
@@ -166,7 +169,7 @@
     return m;
   }
 
-  var FR = { T: T, rng: rng, schedule: schedule, abAt: abAt, timesteps: timesteps, qSample: qSample, identityBasis: identityBasis, dctBasis: dctBasis,
+  var FR = { T: T, rng: rng, schedule: schedule, abAt: abAt, timesteps: timesteps, timestepsFrom: timestepsFrom, qSample: qSample, identityBasis: identityBasis, dctBasis: dctBasis,
     denoise: denoise, posterior: posterior, epsFrom: epsFrom, ddimSigma: ddimSigma, ddimStep: ddimStep, sample: sample,
     flowVelocity: flowVelocity, flowSample: flowSample, straightness: straightness, mixtureMean: mixtureMean };
   if (typeof module !== "undefined" && module.exports) module.exports = FR; else root.FR = FR;

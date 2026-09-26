@@ -96,15 +96,55 @@
   }
   // The irreducible loss: how wrong even the exact best guess is, on average, because a foggy pin could have come from several places.
   function floor(comps, basis, sch, n, seed) {
-    var r = FR.rng(seed == null ? 5 : seed), tot = 0;
+    var r = FR.rng(seed == null ? 5 : seed), tot = 0, cum = [], acc = 0;
+    comps.forEach(function (c) { acc += Math.exp(c.lp); cum.push(acc); });   // pins are drawn with the mixture's own weights
     for (var i = 0; i < n; i++) {
-      var c = comps[Math.floor(r() * comps.length)], p = [c.mu[0] + Math.sqrt(basis.lam[0]) * r.normal(), c.mu[1] + Math.sqrt(basis.lam[1]) * r.normal()];
+      var u = r() * acc, k = 0; while (k < cum.length - 1 && cum[k] < u) k++;
+      var c = comps[k], p = [c.mu[0] + Math.sqrt(basis.lam[0]) * r.normal(), c.mu[1] + Math.sqrt(basis.lam[1]) * r.normal()];
       var t = Math.floor(r() * 1000), ab = FR.abAt(sch, t), e = [r.normal(), r.normal()];
       var xt = [Math.sqrt(ab) * p[0] + Math.sqrt(1 - ab) * e[0], Math.sqrt(ab) * p[1] + Math.sqrt(1 - ab) * e[1]];
       var eh = FR.epsFrom(xt, FR.denoise(xt, ab, comps, basis).x0, ab);
       tot += ((eh[0] - e[0]) * (eh[0] - e[0]) + (eh[1] - e[1]) * (eh[1] - e[1])) / 2;
     }
     return tot / n;
+  }
+  // The floor for a particular log: the best any predictor could do if it knew exactly which pins were logged
+  // (the empirical posterior: weights over the logged pins, ∝ exp(−|x_t − √ᾱ·p|² / (2(1−ᾱ)))). Lower than the
+  // population floor, because a small log is easier to "know" than the whole square: that gap is memorisation.
+  function floorEmpirical(demos, sch, n, seed) {
+    var r = FR.rng(seed == null ? 5 : seed), tot = 0;
+    for (var i = 0; i < n; i++) {
+      var p = demos[Math.floor(r() * demos.length)], t = Math.floor(r() * 1000), ab = FR.abAt(sch, t), a = Math.sqrt(ab), b2 = 1 - ab, e = [r.normal(), r.normal()];
+      var xt = [a * p[0] + Math.sqrt(b2) * e[0], a * p[1] + Math.sqrt(b2) * e[1]], best = -Infinity, lw = new Float64Array(demos.length);
+      for (var k = 0; k < demos.length; k++) { var dx = xt[0] - a * demos[k][0], dy = xt[1] - a * demos[k][1]; lw[k] = -(dx * dx + dy * dy) / (2 * b2); if (lw[k] > best) best = lw[k]; }
+      var sw = 0, mx = 0, my = 0;
+      for (k = 0; k < demos.length; k++) { var w = Math.exp(lw[k] - best); sw += w; mx += w * demos[k][0]; my += w * demos[k][1]; }
+      var x0 = [mx / sw, my / sw], eh = FR.epsFrom(xt, x0, ab);
+      tot += ((eh[0] - e[0]) * (eh[0] - e[0]) + (eh[1] - e[1]) * (eh[1] - e[1])) / 2;
+    }
+    return tot / n;
+  }
+  // A gradient check through trainStep itself: one step on a seeded batch, the gradient read back from Adam's
+  // first moment (m = 0.1·g on the first step), against finite differences of that batch's loss, on several weights and biases.
+  function trainCheck(net, o) {
+    function batchLoss(n) {
+      var r = FR.rng(o.batchSeed || 3), B = 8, L = 0;
+      for (var i = 0; i < B; i++) {
+        var p = o.demos[Math.floor(r() * o.demos.length)], t = Math.floor(r() * 1000), ab = FR.abAt(o.sch, t), e = [r.normal(), r.normal()];
+        var xt = [Math.sqrt(ab) * p[0] + Math.sqrt(1 - ab) * e[0], Math.sqrt(ab) * p[1] + Math.sqrt(1 - ab) * e[1]], out = forward(n, features(xt, t)).out;
+        L += ((out[0] - e[0]) * (out[0] - e[0]) + (out[1] - e[1]) * (out[1] - e[1])) / 2;
+      }
+      return L / B;
+    }
+    var probe = create(net.sizes[1], net.seed), res = trainStep(probe, { batch: 8, lr: 0, rng: FR.rng(o.batchSeed || 3), demos: o.demos, sch: o.sch }), worst = 0;
+    var picks = [[0, 0, 3], [0, 1, 40], [1, 0, 100], [2, 0, 5], [0, 2, 7], [1, 2, 20], [2, 2, 1]];   // [layer, kind (0 weight, 1 bias of that layer via kind 2), index]
+    picks.forEach(function (pk) {
+      var l = pk[0], isBias = pk[1] === 2, idx = pk[2], arr = isBias ? net.b[l] : net.W[l], g = (isBias ? probe.mb[l][idx] : probe.m[l][idx]) / 0.1, h = 1e-6, w0 = arr[idx];
+      var fresh = create(net.sizes[1], net.seed), tgt = isBias ? fresh.b[l] : fresh.W[l];
+      tgt[idx] = w0 + h; var lp = batchLoss(fresh); tgt[idx] = w0 - h; var lm = batchLoss(fresh); tgt[idx] = w0;
+      var num = (lp - lm) / (2 * h), rel = Math.abs(g - num) / Math.max(1e-9, Math.abs(num)); if (rel > worst) worst = rel;
+    });
+    return { worstRelativeError: worst, checked: picks.length, loss: res.loss };
   }
   // A finite-difference check of the gradient on one weight, for the acceptance script.
   function gradCheck(net, o) {
@@ -124,6 +164,6 @@
     return { analytic: gW[0][idx], numeric: (lp - lm) / (2 * h) };
   }
 
-  var N = { NIN: NIN, features: features, create: create, forward: forward, predictEps: predictEps, predictX0: predictX0, trainStep: trainStep, train: train, floor: floor, gradCheck: gradCheck };
+  var N = { NIN: NIN, features: features, create: create, forward: forward, predictEps: predictEps, predictX0: predictX0, trainStep: trainStep, train: train, floor: floor, floorEmpirical: floorEmpirical, gradCheck: gradCheck, trainCheck: trainCheck };
   if (typeof module !== "undefined" && module.exports) module.exports = N; else root.FRNet = N;
 })(typeof window !== "undefined" ? window : this);
