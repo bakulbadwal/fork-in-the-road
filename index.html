@@ -132,7 +132,7 @@ HONESTY: the schedules, the forward process, the denoiser (the exact Bayes poste
     <h3>The schedule: how fast the fog thickens</h3>
     <div class="pg">
       <div class="panel">
-        <p style="font-size:15.5px">DDPM adds a little noise β<sub>t</sub> at each of 1,000 steps. You never apply it a thousand times: <span class="g" data-g="abar">ᾱ<sub>t</sub></span> = ∏(1 − β<sub>i</sub>) gives a shortcut straight to any t. Two knobs: <b>√ᾱ</b> is the map's volume and <b>√(1−ᾱ)</b> the fog's; their squares always sum to 1, so the fog replaces the map instead of piling on top of it.</p>
+        <p style="font-size:15.5px">DDPM adds a little noise at each of 1,000 steps (variance β<sub>t</sub>, so a scale of √β<sub>t</sub>; the step keeps √(1−β<sub>t</sub>) of what it had). You never apply it a thousand times: <span class="g" data-g="abar">ᾱ<sub>t</sub></span> = ∏(1 − β<sub>i</sub>) gives a shortcut straight to any t. Two knobs: <b>√ᾱ</b> is the map's volume and <b>√(1−ᾱ)</b> the fog's; their squares always sum to 1, so the fog replaces the map instead of piling on top of it.</p>
         <p style="font-size:15.5px;margin-top:8px"><b>Linear</b> is diffusers' default (β from 0.0001 to 0.02): half fog by t ≈ 260. <b><span class="g" data-g="cosine">Cosine</span></b> (<code>squaredcos_cap_v2</code>) fogs slowly at first: half fog by t ≈ 500. Notebook 01 trains with cosine, and so does Diffusion Policy.</p>
       </div>
       <div><canvas id="s1chart" class="chart" aria-label="Schedule chart: map volume and fog volume against t"></canvas>

@@ -6,6 +6,10 @@
 
 ![Fork in the Road: a Busytown-style cutaway of a town square, where a courier robot, a pretzel cart and a dispatcher with a joystick each wear their diffusion label](docs/hero.png)
 
+![Step 6, two drives from the real page: the clerk's averaged route drives straight into the pretzel cart (Dent, 1.2 s); the cartographer's diffusion cards commit to the left and reach the bakery (Delivered, 4 cards, 3.6 s, 0 side flips)](docs/linkedin/fork-in-the-road-carousel.gif)
+
+*The same square, driven twice: the clerk averages the route sheets and dents the cart; the cartographer lifts the fog in ten passes per card and goes around it.*
+
 A delivery robot learns from a hundred human drives around a pretzel cart. Half went left, half went right. The **courier** is the robot and its driving rule is the policy; the dispatcher's **route sheets** are the demonstrations; the **cart** is the reason they fork. A **clerk who averages the sheets** is a regression policy, and he drives straight into the cart. **Fog** is noise, the **cartographer** who redraws a foggy map is the denoiser, the **lookout's report** is the observation, and the **waypoint card** of 16 pins is an action chunk. Hold that picture and Diffusion Policy follows.
 
 ## What's inside
