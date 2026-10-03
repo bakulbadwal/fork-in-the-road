@@ -513,7 +513,7 @@
       pinsRow(dc, driven, Ta);
       var seesCart = Math.abs(dc.obsFx - dc.realFx) < 1e-9;
       $("s6st").className = "status" + (finished && lastDrive.hit ? " hit" : "");
-      $("s6st").innerHTML = finished ? (lastDrive.hit ? "<b>Dent.</b> " + lastDrive.decisions.length + " cards, " + lastDrive.time.toFixed(1) + " s, " + lastDrive.flips + " side flip" + (lastDrive.flips === 1 ? "" : "s") + "." : "<b>Delivered.</b> " + lastDrive.decisions.length + " cards, " + lastDrive.time.toFixed(1) + " s, " + lastDrive.flips + " side flip" + (lastDrive.flips === 1 ? "" : "s") + ".") : "card " + (ph.i + 1) + ": the cartographer " + (seesCart ? "sees the cart at " + sgn(dc.obsFx, 1) : "<b>thinks</b> the cart is at " + sgn(dc.obsFx, 1) + " (it's at " + sgn(dc.realFx, 1) + ")") + " · " + (dc.side < 0 ? "going left" : dc.side > 0 ? "going right" : "straight through");
+      $("s6st").innerHTML = finished ? (lastDrive.hit ? "<b>Dent.</b> " + lastDrive.decisions.length + " cards, " + lastDrive.time.toFixed(1) + " s, " + lastDrive.flips + " side flip" + (lastDrive.flips === 1 ? "" : "s") + "." : "<b>Delivered.</b> " + lastDrive.decisions.length + " cards, " + lastDrive.time.toFixed(1) + " s, " + lastDrive.flips + " side flip" + (lastDrive.flips === 1 ? "" : "s") + ".") : "card " + (ph.i + 1) + ": " + (cfg.policy === "averager" ? "the clerk" : "the cartographer") + " " + (seesCart ? "sees the cart at " + sgn(dc.obsFx, 1) : "<b>thinks</b> the cart is at " + sgn(dc.obsFx, 1) + " (it's at " + sgn(dc.realFx, 1) + ")") + " · " + (dc.side < 0 ? "going left" : dc.side > 0 ? "going right" : "straight through");
     }
     function drive() {
       if (running) running.stop();
