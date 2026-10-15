@@ -96,7 +96,7 @@ Every number the build was checked against is in [`ACCEPTANCE.md`](ACCEPTANCE.md
 | `tests/check.js` | Prints every number in `ACCEPTANCE.md` (`node tests/check.js`) |
 | `PRODUCT.md`, `DESIGN.md` | Product brief and design notes |
 
-A sibling of [Inference Kitchen](https://github.com/bakulbadwal/inference-kitchen) (serving), [Policy Pond](https://github.com/bakulbadwal/policy-pond) (reinforcement learning) and [Arm Playground](https://github.com/bakulbadwal/arm-playground) (kinematics and control). Built by [Bakul Badwal](https://github.com/bakulbadwal) (UVA Darden MBA '27) with Claude Code, as an unofficial companion to the Hugging Face Diffusion Models Course. Not affiliated with Hugging Face.
+A sibling of [Inference Kitchen](https://github.com/bakulbadwal/inference-kitchen) (serving), [Policy Pond](https://github.com/bakulbadwal/policy-pond) (reinforcement learning) and [Arm Playground](https://github.com/bakulbadwal/arm-playground) (kinematics and control). Next in the series: [Demos to Deployment](https://bakulbadwal.github.io/arm-playground/demos-to-deployment/), on what happens when the next waypoint card isn't ready in time. Built by [Bakul Badwal](https://github.com/bakulbadwal) (UVA Darden MBA '27) with Claude Code, as an unofficial companion to the Hugging Face Diffusion Models Course. Not affiliated with Hugging Face.
 
 ## License
 
